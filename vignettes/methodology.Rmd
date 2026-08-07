@@ -201,3 +201,48 @@ A future release will accept an optional specification object describing
 expected ranges, required fields and valid domains. Supplying one would make the
 genuine $X = A/B$ measures computable; omitting it would keep today's
 zero-configuration behaviour.
+
+### Sources for the claims in this section
+
+ISO/IEC 25012 and 25024 are paywalled. Every statement above about their
+*structure* is cited below; the individual measure identifiers and formulas are
+deliberately **not** reproduced, because they could not be verified without the
+documents themselves.
+
+* ISO/IEC 25024:2015. *Systems and software engineering — Systems and software
+  Quality Requirements and Evaluation (SQuaRE) — Measurement of data quality.*
+  <https://www.iso.org/standard/35749.html>
+* ISO/IEC 25012:2008. *Software engineering — SQuaRE — Data quality model.*
+  <https://www.iso.org/standard/35736.html>
+* Gualo, F., Rodriguez, M., Verdugo, J., Caballero, I. and Piattini, M. (2021).
+  'Data Quality Certification using ISO/IEC 25012: Industrial Experiences',
+  *Journal of Systems and Software*. <https://arxiv.org/abs/2102.11527>
+
+    The source for three specific claims: that ISO/IEC 25024 measures take the
+    form $X = A/B$ on a ratio scale over $[0.0, 1.0]$; that the Accuracy Range
+    measure (RAN_EXAC) defines its element $B$ as "the number of data items for
+    which can be defined a required interval of values"; and that "ISO/IEC 25024
+    does not specifically address how the measures corresponding to the data
+    quality properties should be aggregated to compute the overall quality level
+    for each data quality characteristic." The authors are from AQCLab, an
+    accredited ISO/IEC 25012 data quality evaluation laboratory.
+
+* Calabrese, J., Esponda, S. and Pesado, P. (2020). 'Framework for Data Quality
+  Evaluation Based on ISO/IEC 25012 and ISO/IEC 25024', *8th Conference on Cloud
+  Computing, Big Data & Emerging Topics*, Universidad Nacional de La Plata.
+  <https://sedici.unlp.edu.ar/handle/10915/104778>
+
+    The source for the five inherent characteristics being Accuracy,
+    Completeness, Consistency, Credibility and Currentness — which is how the
+    naming mismatch with *timeliness* was established.
+
+* Demirhan, O. H. (2024). *Assessing Data Quality Management Issues in
+  Open-Sourced Data Sets with Statistical Methodology.* MSc dissertation,
+  University of Greenwich. Cites ISO/IEC 25024:2015 eight times, all within
+  Chapter 2; the citation establishes what the dimensions mean and is not a
+  claim of measure conformance.
+
+The standard's Annexes A–E — the synoptic table of quality measure elements, the
+measures indexed by element and target entity, and the alphabetic measure list —
+are what a conformant implementation would need. They are not reproduced in any
+public source.

@@ -118,6 +118,61 @@ assessment cannot deliver it.
 Numbers here will not always match numbers in the dissertation.
 `vignette("deviations")` lists every difference and the reason for it.
 
+## v1 vs v2
+
+| | v1 — this release | v2 — planned |
+|---|---|---|
+| Input needed | a data frame, nothing else | data frame, plus an optional `dg_spec()` |
+| Measures | this package's own, each documented | ISO/IEC 25024 form, `X = A/B` over counted elements |
+| Accuracy | outliers against a *derived* interval (μ ± 3σ, or the IQR fence) | values against a *specified* interval from the spec |
+| Completeness | mean missing rate across columns | non-null items ÷ items declared required |
+| Consistency | share of columns with VIF ≤ 5 | contradiction and referential checks; collinearity split out as its own measure |
+| Fourth dimension | `timeliness`, the dissertation's word | `currentness`, ISO's word; `timeliness` kept as an alias |
+| `credibility` | not measured | measured |
+| Scale | 0–10 | `[0.0, 1.0]` ratio per ISO, presented on 0–10 |
+| Aggregation | weighted mean over applicable dimensions | unchanged — ISO/IEC 25024 does not specify aggregation |
+
+v2 does not replace v1. Without a spec it behaves exactly as v1 does; supplying
+one unlocks the measures that need a declared expectation to be computable at
+all. Both matter, because most open data arrives with no data dictionary — which
+is the situation v1 exists for.
+
+## References
+
+The ISO claims above are sourced. The standards themselves are paywalled, so
+their *structure* is cited from the peer-reviewed literature and the individual
+measure identifiers and formulas are **not** reproduced here — they could not be
+verified without the documents.
+
+- ISO/IEC 25024:2015. *Systems and software engineering — Systems and software
+  Quality Requirements and Evaluation (SQuaRE) — Measurement of data quality.*
+  International Organization for Standardization.
+  <https://www.iso.org/standard/35749.html>
+- ISO/IEC 25012:2008. *Software engineering — SQuaRE — Data quality model.*
+  International Organization for Standardization.
+  <https://www.iso.org/standard/35736.html>
+- Gualo, F., Rodriguez, M., Verdugo, J., Caballero, I. and Piattini, M. (2021).
+  'Data Quality Certification using ISO/IEC 25012: Industrial Experiences',
+  *Journal of Systems and Software*. <https://arxiv.org/abs/2102.11527> —
+  source for the `X = A/B` measurement-function form, for the Accuracy Range
+  (RAN_EXAC) measure whose element *B* is "the number of data items for which
+  a required interval of values can be defined", and for the statement that
+  ISO/IEC 25024 does not specify how measures aggregate into a
+  per-characteristic score. Written by an ISO/IEC 25012 accredited evaluation
+  laboratory.
+- Calabrese, J., Esponda, S. and Pesado, P. (2020). 'Framework for Data Quality
+  Evaluation Based on ISO/IEC 25012 and ISO/IEC 25024', *8th Conference on
+  Cloud Computing, Big Data & Emerging Topics*, Universidad Nacional de La
+  Plata. <https://sedici.unlp.edu.ar/handle/10915/104778> — source for the five
+  inherent characteristics being Accuracy, Completeness, Consistency,
+  Credibility and **Currentness**.
+- ISO 25000 Portal. *ISO/IEC 25012 — Data Quality Model.*
+  <https://iso25000.com/index.php/en/iso-25000-standards/iso-25012>
+
+Building v2 properly requires the standard's Annexes A–E (the synoptic table of
+quality measure elements, the measures by element and target entity, and the
+alphabetic measure list). Those are not in any public source.
+
 ## Licence
 
 MIT © Omer Haluk Demirhan
