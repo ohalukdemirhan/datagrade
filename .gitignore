@@ -1,0 +1,9 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+docs/
+datagrade-figures/
+*.tar.gz
+*.Rcheck/
+inst/doc

@@ -1,0 +1,203 @@
+---
+title: "Methodology: every formula, stated"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Methodology: every formula, stated}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(datagrade)
+```
+
+Every score this package reports is written out below. Nothing is a black box,
+and where a choice is arguable the argument is given rather than hidden.
+
+All four dimension scores live on a **0--10 scale**. `as_pct()` converts once, at
+the point of display, to 0--100. Holding one scale internally is deliberate: the
+implementation this package replaces kept completeness on 0--10 and consistency
+on 0--1 and multiplied both by ten, which is why its published consistency
+figure for `iris` reads 2.5% where 25% was meant.
+
+## Completeness
+
+$$
+\text{completeness} = 10 \times \left(1 - \frac{1}{p}\sum_{j=1}^{p} \frac{m_j}{n}\right)
+$$
+
+where $m_j$ is the number of missing values in column $j$, $n$ the row count and
+$p$ the column count.
+
+This is the **mean of the per-column missing rates**, not the overall share of
+missing cells. The two differ whenever columns are unequally incomplete, and the
+column-averaged form dilutes a badly damaged column: one column that is 30%
+empty out of four costs 0.75 points, not 3. That is a property of the published
+formula, kept here for continuity with the dissertation; if you want the cell
+ratio, compute it from `report$missing$columns`.
+
+```{r}
+report <- dg_assess(airquality, verbose = FALSE)
+report$missing$columns
+report$scores[["completeness"]]
+```
+
+## Accuracy
+
+$$
+\text{accuracy} = 10 \times \left(1 - \frac{\text{outliers flagged}}{\text{numeric values tested}}\right)
+$$
+
+Outliers are flagged by one of two rules.
+
+**Z-score.** A value is flagged when $\left|\frac{x_i - \mu}{\sigma}\right| > 3$.
+
+**IQR.** A value is flagged when it falls outside
+$[Q_1 - 1.5\,\text{IQR},\; Q_3 + 1.5\,\text{IQR}]$.
+
+Two implementation choices are worth stating plainly.
+
+*Outliers are counted on observed values, not imputed ones.* Mean imputation
+adds mass at the centre of the distribution and shrinks $\sigma$, which
+mechanically suppresses the very z-scores this step exists to find. The
+dissertation ran this step after imputation; this package does not.
+
+*A zero-variance column contributes zero outliers, not `NA`.* `scale()` returns
+`NaN` when $\sigma = 0$, and summing that propagated `NA` through the entire
+report, so a single constant column made the whole outlier count unreportable.
+
+```{r}
+df <- data.frame(constant = rep(5, 50), varying = c(rnorm(49), 100))
+detect_outliers(df)$by_column
+```
+
+## Consistency
+
+$$
+\text{consistency} = 10 \times \frac{\left|\{j : \mathrm{VIF}_j \le \tau\}\right|}{p_{\text{num}}}
+$$
+
+with $\tau$ = `vif_threshold`, default 5.
+
+The variance inflation factor is defined as $\mathrm{VIF}_j = \frac{1}{1 - R_j^2}$,
+where $R_j^2$ comes from regressing column $j$ on all other numeric columns. This
+package does not fit those regressions. It uses the identity that the VIFs are
+the **diagonal of the inverted correlation matrix**:
+
+$$
+\mathrm{VIF} = \operatorname{diag}\left(\mathbf{R}^{-1}\right)
+$$
+
+which gives the same numbers in $O(p^3)$ time, independent of the row count. The
+equivalence is asserted in the test suite against explicit `lm()` fits:
+
+```{r}
+set.seed(11)
+d <- data.frame(a = rnorm(500), b = rnorm(500))
+d$c <- 0.6 * d$a + 0.3 * d$b + rnorm(500)
+
+dg_vif(d)
+
+vapply(names(d), function(col) {
+  r2 <- summary(lm(d[[col]] ~ ., data = d[setdiff(names(d), col)]))$r.squared
+  1 / (1 - r2)
+}, numeric(1))
+```
+
+Perfectly collinear columns are reported as `Inf` rather than dropped, so they
+stay visible and still count against the score.
+
+## Timeliness
+
+$$
+\text{timeliness} = 10 \times \left(1 - \frac{\text{future dates} + \text{stale dates}}{\text{dates present}}\right)
+$$
+
+A date is *future* if it is after `Sys.Date()`, *stale* if it is more than
+`stale_years` (default 10) old.
+
+This dimension is only measurable if date columns exist. Character columns are
+therefore parsed as dates **before** any text normalisation runs -- otherwise
+punctuation stripping turns `"2024-01-15"` into `"20240115"` and no date column
+ever exists.
+
+```{r}
+df <- data.frame(when = c("2024-01-15", "2024-02-20"), value = 1:2)
+r <- dg_assess(df, verbose = FALSE, strip_punctuation = TRUE)
+r$parsed_dates
+r$dates
+```
+
+## Distribution
+
+Skewness and kurtosis use the sample moment forms:
+
+$$
+g_1 = \frac{1}{n}\sum \left(\frac{x_i-\mu}{\sigma}\right)^3
+\qquad
+g_2 = \frac{1}{n}\sum \left(\frac{x_i-\mu}{\sigma}\right)^4 - 3
+$$
+
+The $-3$ makes $g_2$ **excess** kurtosis, so a normal distribution scores 0. This
+matters: the dissertation's formula subtracts 3 but its code called
+`moments::kurtosis()`, which does not, so the published formula and the
+published code disagreed by exactly 3. The formula is the contract here.
+
+Normality uses the Shapiro-Wilk test, which is undefined above 5,000
+observations. Larger columns are tested on a deterministic subsample and the
+size actually used is reported in `shapiro_n`, so the result is never presented
+as though the whole column were tested.
+
+```{r}
+set.seed(42)
+analyze_distribution(data.frame(normal = rnorm(20000), skewed = rexp(20000)))
+```
+
+## The overall score
+
+$$
+\text{overall} = \frac{\sum_{d \in D} w_d \, s_d}{\sum_{d \in D} w_d}
+$$
+
+where $D$ is the set of dimensions that **apply** to the data. A data set with
+no date columns cannot be scored on timeliness, so timeliness is dropped and the
+remaining weights are renormalised rather than the data being penalised for a
+dimension it cannot have.
+
+```{r}
+text_only <- data.frame(a = c("x", "y", "z"), stringsAsFactors = FALSE)
+r <- dg_assess(text_only, verbose = FALSE)
+r$scores
+r$overall
+```
+
+## Relationship to ISO/IEC 25012 and 25024
+
+The four dimension names are drawn from the ISO/IEC 25012 data quality model,
+which is how the dissertation frames them. **The measures themselves are this
+package's own and are not ISO/IEC 25024 conformant measures.** That claim is not
+made anywhere in the package, and the reasons are worth being explicit about:
+
+* ISO/IEC 25012's fourth inherent characteristic is **currentness**, not
+  *timeliness*; *timeliness* comes from a different tradition. The package uses
+  the dissertation's word.
+* ISO/IEC 25024 measures take the form $X = A/B$ over counted *quality measure
+  elements*. Computing $B$ generally requires metadata -- for the accuracy-range
+  measure, $B$ is "the number of data items for which a required interval of
+  values can be defined", which cannot be known from the data alone. This is
+  precisely why the metadata-driven packages in this space require a data
+  dictionary before they will run.
+* ISO/IEC 25024 does not specify how measures aggregate into a per-characteristic
+  score. The 0--10 weighted mean here is this package's choice, not a standard's.
+* **Credibility**, the fifth inherent characteristic, is not measured at all.
+
+Substituting a statistically derived interval for a specified one, as the
+accuracy score does, measures *plausibility* rather than accuracy in the ISO
+sense: an outlier need not be wrong, and a wrong value can sit exactly on the
+mean. Read the accuracy score accordingly.
+
+A future release will accept an optional specification object describing
+expected ranges, required fields and valid domains. Supplying one would make the
+genuine $X = A/B$ measures computable; omitting it would keep today's
+zero-configuration behaviour.

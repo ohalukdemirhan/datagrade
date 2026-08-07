@@ -1,0 +1,174 @@
+---
+title: "Deviations from the dissertation"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Deviations from the dissertation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(datagrade)
+```
+
+This package implements the framework described in:
+
+> Demirhan, O. H. (2024). *Assessing Data Quality Management Issues in
+> Open-Sourced Data Sets with Statistical Methodology.* MSc dissertation,
+> University of Greenwich.
+
+The dissertation is a fixed, submitted document. This package is not, and where
+the two disagree the disagreement is recorded here rather than quietly resolved.
+Anyone comparing a number in the dissertation against a number this package
+produces should read this page first.
+
+## Numbers that changed
+
+### Consistency score for `iris`
+
+The dissertation reports **2.5%**. This package reports **2.5 / 10, which is
+25%**.
+
+The scoring function returned a proportion on 0--1 while completeness returned a
+score on 0--10, and the caller multiplied both by ten as though they were on the
+same scale. The underlying quantity was never wrong; its presentation was off by
+a factor of ten. Scores are now held on 0--10 everywhere and converted to
+percentages in exactly one place.
+
+```{r}
+report <- dg_assess(iris, verbose = FALSE)
+report$scores[["consistency"]]
+```
+
+### Redundant columns
+
+The dissertation reports `"Petal.Length", "Petal.Width", "Sepal.Length"`, which
+is correct. The code that produced it also appended the literal strings `"row"`
+and `"col"`, because it took `colnames()` of the index matrix returned by
+`which(..., arr.ind = TRUE)` -- whose columns are named "row" and "col" -- rather
+than the names of the correlation matrix. At a high enough threshold the
+function returned those two strings and nothing else, reporting redundancy in
+data that had none.
+
+```{r}
+flag_redundant_columns(iris, 0.5)$columns
+flag_redundant_columns(iris, 0.99)$columns
+```
+
+### Kurtosis
+
+The dissertation's formula subtracts 3, so that a normal distribution scores 0.
+Its code called `moments::kurtosis()`, which does not subtract 3 and returns 3
+for a normal distribution. Formula and code disagreed by exactly that constant.
+This package follows the formula.
+
+## Behaviour that changed
+
+### Figures are produced
+
+The plotting code was written as `ggplot(...) + labs(...) + theme_minimal() %>%
+print()`. Because `%>%` binds more tightly than `+`, that parses as
+`ggplot(...) + labs(...) + (theme_minimal() %>% print())`: the *theme object*
+was printed and the plot was discarded. Inside a `for` loop, where auto-printing
+does not happen, no figure was ever displayed. The boxplots, heatmaps and
+histograms shown in the dissertation cannot be produced by the code that
+accompanies it.
+
+### The function returns something
+
+The dissertation documents a "Returns" section listing completeness, outlier
+count, consistency and so on. The implementation printed all of it with `cat()`
+and returned `NULL`. `dg_assess()` returns a `dg_report` object; printing is a
+side effect.
+
+### The `data` argument exists
+
+`data = my_data_frame` is documented in three places in the dissertation and
+implemented in none of them -- only `path` existed. It now works.
+
+### Text is not destroyed
+
+Text cleaning applied `gsub("[^a-zA-Z0-9 ]", "")` unconditionally, deleting
+every accented and non-Latin character, every date separator and every `@`. An
+assessment tool should diagnose, not operate, so whitespace normalisation is the
+only default and everything else is opt-in and Unicode-aware.
+
+```{r}
+df <- data.frame(city = c(" Ağrı ", "Çorum"), email = c("a@b.com", "c@d.org"),
+                 stringsAsFactors = FALSE)
+clean_text_columns(df)
+clean_text_columns(df, strip_punctuation = TRUE)
+```
+
+### Dates are parsed before text is touched
+
+Because a CSV delivers dates as character and text cleaning stripped the
+separators, no `Date` column ever existed and the date validation step silently
+checked nothing. Date parsing now runs first.
+
+### Identifier detection actually fires
+
+Appendix A.3 tests uniqueness *after* the storage-type tests, so the `"ID"`
+branch was unreachable: a character key matched `is.character()` and returned
+`"Text"`. The uniqueness test now runs first.
+
+It also runs with an extra condition that the dissertation did not need but this
+implementation does: a numeric column qualifies as a key only if its values are
+whole numbers. Without it, every continuous measurement column is distinct in
+every row, gets classified as an identifier, and is excluded from the
+statistics -- which silently inflated the consistency score to a perfect 10.
+
+### Outliers are counted before imputation
+
+Mean imputation adds mass at the centre and shrinks the standard deviation,
+suppressing the z-scores the outlier step is looking for. The dissertation ran
+outlier detection on the imputed frame; this package uses observed values.
+
+### Nothing is written to the global environment
+
+`assign("imported_data", data, envir = .GlobalEnv)` clobbered the user's
+workspace and would fail `R CMD check` outright.
+
+## Crashes that were fixed
+
+| Input | Old behaviour |
+|---|---|
+| A constant column | `scale()` returns `NaN`, whole outlier count becomes `NA` |
+| Exactly one numeric column | `data[, sapply(data, is.numeric)]` drops to a vector, `cor()` fails |
+| One redundant pair | Index matrix drops to a vector, `rownames()` is `NULL` |
+| An all-`NA` column | Mean is `NaN`, written into every row by imputation |
+| Perfect collinearity | `vif()` aborts on aliased coefficients |
+| Zero rows | Several checks error |
+
+Each has a named regression test in `tests/testthat/test-edge-cases.R`.
+
+## Documentation that was reconciled
+
+* `visualise_outliers` in the dissertation's examples versus
+  `visualize_outliers` in its code; the argument is now `visualize_outliers`
+  throughout.
+* `correlation_threshold` defaulted to 0.5 in the text, 0.9 in the helper and
+  0.1 in Appendix A.8. It is 0.5.
+* `weights`, `scoring_ranges` and `return_imputed_data` were accepted and never
+  used. `weights` now works; the other two are gone.
+* The dissertation describes 13 helper functions but ships a 14th
+  (`flag_anomalies_in_relationships`) that Appendix A does not cover. It is
+  retained, documented, and off by default.
+
+## The standard
+
+The dissertation cites ISO/IEC 25024:2015 eight times, all of them in the
+literature review, none in the methodology or implementation chapters. The
+citation establishes what the dimensions *mean*; it is not a claim of measure
+conformance, and this package does not make one either. See the "Relationship to
+ISO/IEC 25012 and 25024" section of `vignette("methodology")` for what would be
+required.
+
+## What did not change
+
+The scoring framework, the four dimensions, the choice of z-score and IQR
+methods, the VIF-based consistency check, the correlation-based redundancy
+check, the Shapiro-Wilk normality test, the mean and median imputation options,
+and the names of all thirteen helper functions. This is the dissertation's
+framework, repaired -- not a redesign.

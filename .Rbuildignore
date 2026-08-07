@@ -1,0 +1,9 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^README\.Rmd$
+^\.github$
+^docs$
+^inst/bench$
+^datagrade-figures$
+^man-roxygen$
+^\.gitignore$

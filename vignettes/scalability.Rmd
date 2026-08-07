@@ -1,0 +1,106 @@
+---
+title: "Scalability: 54 thousand to 10 million rows"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Scalability: 54 thousand to 10 million rows}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+## What was measured
+
+The anchor is `ggplot2::diamonds` -- 53,940 rows across 10 columns, shipped
+under the MIT licence with ggplot2 itself. Larger sizes are that same real data
+replicated with 1% multiplicative jitter on the numeric columns, so the column
+count, the type mix and the correlation structure stay realistic while the row
+count grows. Rows beyond 53,940 are therefore replications of real data, not
+real data; the timing behaviour is what is being demonstrated, not a claim about
+a genuinely distinct 10-million-row corpus.
+
+Reproduce with `Rscript inst/bench/benchmark.R`.
+
+## Results
+
+R 4.5.2, macOS arm64, single core.
+
+| Rows | Input | Full | No duplicate scan | Figures | Report object |
+|---|---|---|---|---|---|
+| 53,940 | 3.5 MB | 0.12 s | 0.07 s | 0.11 s | 82 KB |
+| 100,000 | 6.8 MB | 0.26 s | 0.16 s | 0.10 s | 83 KB |
+| 500,000 | 34 MB | 1.40 s | 0.57 s | 0.10 s | 84 KB |
+| 1,000,000 | 68 MB | 2.99 s | 0.98 s | 0.10 s | 83 KB |
+| 5,000,000 | 340 MB | 17.08 s | 4.86 s | 0.11 s | 83 KB |
+| 10,000,000 | 680 MB | 38.04 s | 9.44 s | 0.12 s | 83 KB |
+
+Three things to read off that table.
+
+**Cost is linear.** Per-row cost is 1.37 µs at 54 thousand rows and 0.94 µs at
+10 million -- it goes *down*, because fixed startup cost amortises. There is no
+size at which the curve bends.
+
+**The report does not grow.** The input grows 185-fold, from 3.5 MB to 680 MB.
+The returned object grows by about 1%, from 82 KB to 83 KB. It holds summary
+statistics, never the data.
+
+**Figures are constant-time.** Rendering costs about 0.11 s at every size,
+because the plots are built from precomputed bin counts and five-number
+summaries rather than from the observations.
+
+Scores are identical at every size (overall 7.59--7.60), which is the check that
+the subsampling used in the expensive steps is not biasing the result.
+
+## How
+
+**Nothing plots raw data.** `histogram_bins()` computes bin counts with
+`tabulate(findInterval(...))` and `boxplot_stats()` computes a five-number
+summary per column. The ggplot objects receive 30 rows per histogram and one row
+per boxplot. A `geom_histogram()` on 10 million observations would carry all 10
+million into the plot object.
+
+**VIF does not fit regressions.** The variance inflation factors come from
+`diag(solve(cor(X)))`, which is $O(p^3)$ in the *column* count and completely
+independent of the row count. Fitting $p$ auxiliary regressions instead is
+$O(n p^2)$.
+
+**Expensive steps subsample deterministically.** Shapiro-Wilk is undefined above
+5,000 observations and is given a fixed subsample; the random-forest anomaly
+model is fitted on at most `sample_size` rows and then applied to all of them.
+`subsample()` saves and restores `.Random.seed`, so it neither depends on nor
+disturbs the caller's random state.
+
+**Duplicate detection was rewritten.** This was the one genuinely superlinear
+step, and it dominated everything else:
+
+| Rows | `duplicated.data.frame` | Integer codes + hash |
+|---|---|---|
+| 1,000,000 | 3.8 s | 3.0 s |
+| 5,000,000 | 58.7 s | 17.1 s |
+| 10,000,000 | **494.2 s** | **38.0 s** |
+
+`duplicated()` on a data frame builds one list per row before comparing them, so
+at 10 million rows it spent over eight minutes allocating. Encoding each column
+to integer codes with `match(col, unique(col))` and hashing one short key per row
+returns a bit-identical answer in linear time. It is the single largest
+performance change in the package.
+
+If you do not need the duplicate count at all, `check_duplicates = FALSE` takes
+10 million rows to 9.4 s.
+
+## Column count, not row count
+
+The one thing that does grow non-linearly is the **column** count, through the
+$O(p^3)$ matrix inversion in the VIF calculation and the $O(p^2)$ correlation
+matrix. That is fine for the hundreds of columns a tabular data set typically
+has and would not be fine for tens of thousands. If you have a very wide matrix,
+assess a column subset.
+
+## Memory
+
+Peak memory is roughly the size of the input plus one numeric copy of the
+numeric columns (created by `numeric_matrix()` for the correlation and VIF
+steps). The 680 MB input peaked around 1.4 GB. Imputation copies only the
+columns it actually changes.
