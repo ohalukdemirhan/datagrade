@@ -12,8 +12,8 @@
 \item{...}{Unused.}
 }
 \value{
-A list of data frames: `scores`, `columns`, `redundant_pairs` and
-  `distribution`.
+A list of data frames: `scores`, `measures`, `columns`,
+  `redundant_pairs` and `distribution`.
 }
 \description{
 Tabular summary of a quality report

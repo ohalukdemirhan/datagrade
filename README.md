@@ -2,14 +2,20 @@
 
 Point it at a data frame. Get a score.
 
-`datagrade` assesses the quality of a tabular data set and scores it on four
-dimensions — completeness, accuracy, consistency and timeliness — then returns a
-report object with tables and figures. No configuration, no metadata file, no
-rules to write first.
+`datagrade` assesses the quality of a tabular data set against the **ISO/IEC
+25012 data quality model** — five inherent characteristics, fifteen quality
+properties — and returns a report object with tables and figures.
 
-That last part is the point. The existing R packages for data quality
-(`DQA`, `DQAstats`, `dataquieR`) all require a metadata repository or data
-dictionary before they will run. `datagrade` runs on anything with columns.
+Six of the fifteen properties are computable from a table alone, so it runs on
+anything with columns. That is the point. The existing R packages for data
+quality (`DQA`, `DQAstats`, `dataquieR`) all require a metadata repository or
+data dictionary before they will run at all.
+
+The other nine measure the data against an expectation, and an expectation is
+something a person declares — so `dg_spec()` is where you declare it. Supply
+one and those measures light up. Supply nothing and they report as *not
+applicable*, never as zero: a score of zero is a claim about the data, `NA` is
+a statement that the standard's denominator could not be counted.
 
 ## Install
 
@@ -32,20 +38,27 @@ Source: in-memory data frame
 Size: 53940 rows x 10 columns
 Elapsed: 0.15s
 
-── Scores ──
+── ISO/IEC 25012 characteristics ──
 
-• completeness: 10.0/10 (100%) - good
-• accuracy: 9.9/10 (99.3%) - good
-• consistency: 2.9/10 (28.6%) - critical
-• timeliness: not applicable
+• accuracy: not applicable (0/3 measures)
+• completeness: 1.000 (100%) - good (3/4 measures)
+• consistency: 0.600 (60%) - serious (2/4 measures)
+• credibility: not applicable (0/2 measures)
+• currentness: not applicable (0/2 measures)
 
-Overall: 7.6/10 (75.9%) - warning
+Overall: 0.800 (80%) - warning
+
+Not ISO: plausibility 0.993 (99.3%) - outliers against a derived interval,
+excluded from the overall score.
+
+ℹ 10 of 15 measures need a declared expectation. See `report$measures` and `dg_spec()`.
 
 ── Findings ──
 
 • Missing values: 0 across 0 columns
 • Duplicate rows: 146 (0.27%)
 • Outliers (z_score): 2798 of 377580 numeric values
+• No identifier column detected
 • Redundant pairs above |r| > 0.5: 10 (strongest carat~x at 0.98)
 • Suggested to drop: carat, price, x, and y
 • VIF above 5: carat, price, x, y, and z
@@ -54,11 +67,44 @@ Overall: 7.6/10 (75.9%) - warning
 The printout is a side effect. The object is the product:
 
 ```r
-report$scores            # named vector, 0-10
+report$scores            # five characteristics, ratios in [0, 1]
+report$measures          # fifteen properties: code, value, A, B, applicable
 report$redundancy$pairs  # data frame of correlated column pairs
 summary(report)$columns  # per-column type, missingness, outliers, VIF
 as.data.frame(report)    # one row, for stacking across many data sets
 ```
+
+## Declaring what the data should look like
+
+```r
+spec <- dg_spec(
+  required = c("id", "dept", "amount"),
+  patterns = list(id = "^[A-Z]{2}-[0-9]{4}$"),
+  domains  = list(dept = c("SALES", "OPS", "HR")),
+  ranges   = list(amount = c(0, 1000)),
+  rules    = list(order = ~ start <= end)
+)
+
+dg_assess(orders, spec = spec)
+```
+
+Every argument is optional, and each one switches on the measures that depend
+on it. `report$measures` says which, and why the rest are still `NA`:
+
+```
+          code   characteristic value    a    b                                note
+     EXAC_SINT         accuracy 1.000  400  400                                <NA>
+    EXAC_SEMAN         accuracy    NA   NA   NA  needs spec$reference and reference_key
+      RAN_EXAC         accuracy 0.974  187  192                                <NA>
+      COMP_REG     completeness 0.960  192  200                                <NA>
+  COMP_VAL_ESP     completeness 0.990  792  800                                <NA>
+     COMP_FICH     completeness    NA   NA   NA          needs spec$expected_records
+ FAL_COMP_FICH     completeness 1.000  400  400                                <NA>
+```
+
+`A` is the count of items satisfying the property, `B` the count of items for
+which the property is defined at all. That second number is where the metadata
+lives, and it is the whole reason nine measures need a spec.
 
 Figures come from `dg_plots(report)`:
 
@@ -109,40 +155,71 @@ This implements the framework from:
 > Open-Sourced Data Sets with Statistical Methodology.* MSc dissertation,
 > University of Greenwich.
 
-The four dimension **names** follow the ISO/IEC 25012 data quality model. The
-**measures** are this package's own — they are not ISO/IEC 25024 conformant
-measures, and the package does not claim to be. `vignette("methodology")`
-explains exactly what conformance would require and why zero-configuration
-assessment cannot deliver it.
-
-Numbers here will not always match numbers in the dissertation.
+The dissertation scored four dimensions with measures of its own devising. This
+release keeps its statistics but restructures the scoring to follow the ISO/IEC
+25012 model, so numbers here will not always match numbers in the dissertation.
 `vignette("deviations")` lists every difference and the reason for it.
 
-## v1 vs v2
+## The fifteen properties
 
-| | v1 — this release | v2 — planned |
-|---|---|---|
-| Input needed | a data frame, nothing else | data frame, plus an optional `dg_spec()` |
-| Measures | this package's own, each documented | ISO/IEC 25024 form, `X = A/B` over counted elements |
-| Accuracy | outliers against a *derived* interval (μ ± 3σ, or the IQR fence) | values against a *specified* interval from the spec |
-| Completeness | mean missing rate across columns | non-null items ÷ items declared required |
-| Consistency | share of columns with VIF ≤ 5 | contradiction and referential checks; collinearity split out as its own measure |
-| Fourth dimension | `timeliness`, the dissertation's word | `currentness`, ISO's word; `timeliness` kept as an alias |
-| `credibility` | not measured | measured |
-| Scale | 0–10 | `[0.0, 1.0]` ratio per ISO, presented on 0–10 |
-| Aggregation | weighted mean over applicable dimensions | unchanged — ISO/IEC 25024 does not specify aggregation |
+| Characteristic | Property | Code | Needs a spec |
+|---|---|---|---|
+| Accuracy | Syntactic accuracy | `EXAC_SINT` | `patterns` or `domains` |
+| | Semantic accuracy | `EXAC_SEMAN` | `reference`, `reference_key` |
+| | Accuracy range | `RAN_EXAC` | `ranges` |
+| Completeness | Record completeness | `COMP_REG` | no |
+| | Data value completeness | `COMP_VAL_ESP` | no |
+| | File completeness | `COMP_FICH` | `expected_records` |
+| | False completeness of file | `FAL_COMP_FICH` | no |
+| Consistency | Referential integrity | `INT_REF` | `foreign_keys` |
+| | Risk of inconsistency | `RIES_INCO` | no |
+| | Semantic consistency | `CONS_SEMAN` | `rules` |
+| | Format consistency | `CONS_FORM` | no |
+| Credibility | Data values credibility | `CRED_VAL_DAT` | `credible_ranges`/`credible_domains` |
+| | Source credibility | `CRED_FUEN` | `source_trust`, `trusted_sources` |
+| Currentness | Update frequency | `FREC_ACT` | `update_interval` |
+| | Timeliness of update | `CONV_ACT` | no |
 
-v2 does not replace v1. Without a spec it behaves exactly as v1 does; supplying
-one unlocks the measures that need a declared expectation to be computable at
-all. Both matter, because most open data arrives with no data dictionary — which
-is the situation v1 exists for.
+Two of the six zero-configuration measures deserve a note, because both infer
+their expectation from the column itself rather than from a declaration:
+
+- **`FAL_COMP_FICH`** compares text values against a short, deliberately
+  conservative list of placeholders — `"N/A"`, `"unknown"`, `"-999"` and a
+  dozen more, matched case-insensitively after trimming. Pass
+  `null_equivalents` to replace the list, or `character(0)` to switch the
+  check off.
+- **`CONS_FORM`** reduces each value to a shape — digit runs become `9`, letter
+  runs `A` — and measures how many share their column's dominant shape. A
+  column whose values collapse to many shapes has no format to be consistent
+  with, so free text is excluded from the denominator and named in the measure's
+  `note` rather than scored near zero.
+
+### What is *not* claimed
+
+`plausibility` is reported alongside the five characteristics and excluded from
+the overall score. It is the dissertation's accuracy measure: outliers against
+an interval **derived** from the data (μ ± 3σ, or the IQR fence). Every ISO
+accuracy property requires an interval, pattern or reference that was
+**declared**, so substituting a statistically derived one measures plausibility,
+not accuracy — an outlier need not be wrong, and a wrong value can sit exactly
+on the mean. It is kept because it is genuinely useful on undocumented data, and
+named honestly because it is not the standard's measure.
+
+Aggregation from properties to characteristics is the unweighted mean over the
+properties that apply; from characteristics to `overall` it is the weighted mean
+over the characteristics that apply. **ISO/IEC 25024 does not specify how
+measures aggregate**, so both steps are this package's choice, not the
+standard's.
 
 ## References
 
-The ISO claims above are sourced. The standards themselves are paywalled, so
-their *structure* is cited from the peer-reviewed literature and the individual
-measure identifiers and formulas are **not** reproduced here — they could not be
-verified without the documents.
+The ISO claims above are sourced. The standards themselves are paywalled. The
+model's *structure* — the five inherent characteristics, the fifteen properties
+beneath them and their identifiers — is taken from the peer-reviewed literature
+cited below. The standard's own measurement functions are **not** reproduced:
+each measure here is this package's implementation of the named property, in
+the `A / B` form the standard uses, with its `A` and `B` stated in
+`report$measures` and derived in `vignette("methodology")`.
 
 - ISO/IEC 25024:2015. *Systems and software engineering — Systems and software
   Quality Requirements and Evaluation (SQuaRE) — Measurement of data quality.*
@@ -165,13 +242,15 @@ verified without the documents.
   Cloud Computing, Big Data & Emerging Topics*, Universidad Nacional de La
   Plata. <https://sedici.unlp.edu.ar/handle/10915/104778> — source for the five
   inherent characteristics being Accuracy, Completeness, Consistency,
-  Credibility and **Currentness**.
-- ISO 25000 Portal. *ISO/IEC 25012 — Data Quality Model.*
-  <https://iso25000.com/index.php/en/iso-25000-standards/iso-25012>
-
-Building v2 properly requires the standard's Annexes A–E (the synoptic table of
-quality measure elements, the measures by element and target entity, and the
-alphabetic measure list). Those are not in any public source.
+  Credibility and **Currentness**, and for the decomposition of each into the
+  fifteen quality properties and their identifiers (`EXAC_SINT`, `COMP_REG`,
+  `RIES_INCO`, `CRED_FUEN`, `CONV_ACT` and the rest) implemented here.
+What remains unverified against the standard itself is the exact definition of
+each measure's quality measure elements — precisely which items ISO counts into
+`A` and `B` for a given property. Those are in Annexes A–E of ISO/IEC 25024,
+which are not in any public source. Where this package had to choose, the choice
+is stated in `vignette("methodology")` and visible in the `a` and `b` columns of
+`report$measures`, so it can be checked and disagreed with.
 
 ## Licence
 

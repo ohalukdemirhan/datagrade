@@ -8,12 +8,14 @@
 dg_assess(
   data = NULL,
   path = NULL,
+  spec = NULL,
   outlier_method = c("z_score", "iqr"),
   imputation_method = c("mean", "median", "none"),
   correlation_threshold = 0.5,
   vif_threshold = 5,
   category_column = NULL,
-  weights = c(completeness = 1, accuracy = 1, consistency = 1, timeliness = 1),
+  weights = c(accuracy = 1, completeness = 1, consistency = 1, credibility = 1,
+    currentness = 1),
   clean_text = TRUE,
   strip_punctuation = FALSE,
   parse_dates = TRUE,
@@ -32,6 +34,10 @@ data_quality_assessment(...)
 
 \item{path}{Path to a `.csv`, `.xls` or `.xlsx` file.}
 
+\item{spec}{A [dg_spec()] declaring what the data is supposed to look like.
+Optional; without it the nine specification-dependent measures report as
+not applicable.}
+
 \item{outlier_method}{`"z_score"` (default) or `"iqr"`.}
 
 \item{imputation_method}{`"mean"` (default), `"median"` or `"none"`.}
@@ -45,9 +51,10 @@ against the consistency score.}
 \item{category_column}{Optional grouping column for outlier and correlation
 analysis.}
 
-\item{weights}{Named weights for the four dimensions in the overall score.
-Dimensions that do not apply to the data are dropped and the remaining
-weights renormalised.}
+\item{weights}{Named weights for the five characteristics in the overall
+score. Characteristics that do not apply to the data are dropped and the
+remaining weights renormalised. `timeliness` is accepted as an alias for
+`currentness`.}
 
 \item{clean_text}{Normalise whitespace in character columns.}
 
@@ -78,10 +85,27 @@ An object of class `dg_report`. See [print.dg_report()],
 }
 \description{
 Runs every check in the package and returns a `dg_report` object scoring the
-data on the four ISO/IEC 25024 dimensions used in the underlying
-dissertation: completeness, accuracy, consistency and timeliness.
+data on the five inherent characteristics of the ISO/IEC 25012 data quality
+model — accuracy, completeness, consistency, credibility and currentness —
+through the fifteen quality properties beneath them. Each property is
+measured as a ratio `A / B` over counted data items, the form ISO/IEC 25024
+measurement functions take.
 }
 \details{
+Six of the fifteen properties are computable from a table alone. The other
+nine have a denominator that counts *the items for which an expectation is
+declared*, which no data set contains; supply a [dg_spec()] to make them
+measurable. Without one they are reported as not applicable and dropped from
+the aggregate, never scored as zero.
+
+A sixth, non-ISO score is reported alongside them. `plausibility` is the
+outlier-based measure this package used before it followed the standard: it
+compares values against an interval *derived* from the data rather than one
+declared in a specification. That makes it useful and cheap on data with no
+documentation, but it is not accuracy in the ISO sense — an outlier need not
+be wrong, and a wrong value can sit exactly on the mean — so it is reported
+separately and excluded from the overall score.
+
 The function never modifies the caller's data. Text normalisation and
 imputation are applied to an internal copy used for the statistics, and the
 imputed frame is returned only when `keep_data = TRUE`.
@@ -92,5 +116,10 @@ imputed frame is returned only when `keep_data = TRUE`.
 \examples{
 report <- dg_assess(iris, verbose = FALSE)
 report$scores
-summary(report)
+report$measures[, c("code", "value", "a", "b")]
+
+# Declaring an expectation makes the accuracy measures computable.
+spec <- dg_spec(ranges = list(Sepal.Length = c(4, 8)),
+                domains = list(Species = levels(iris$Species)))
+dg_assess(iris, spec = spec, verbose = FALSE)$scores
 }

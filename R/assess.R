@@ -1,8 +1,25 @@
 #' Assess the quality of a data set
 #'
 #' Runs every check in the package and returns a `dg_report` object scoring the
-#' data on the four ISO/IEC 25024 dimensions used in the underlying
-#' dissertation: completeness, accuracy, consistency and timeliness.
+#' data on the five inherent characteristics of the ISO/IEC 25012 data quality
+#' model — accuracy, completeness, consistency, credibility and currentness —
+#' through the fifteen quality properties beneath them. Each property is
+#' measured as a ratio `A / B` over counted data items, the form ISO/IEC 25024
+#' measurement functions take.
+#'
+#' Six of the fifteen properties are computable from a table alone. The other
+#' nine have a denominator that counts *the items for which an expectation is
+#' declared*, which no data set contains; supply a [dg_spec()] to make them
+#' measurable. Without one they are reported as not applicable and dropped from
+#' the aggregate, never scored as zero.
+#'
+#' A sixth, non-ISO score is reported alongside them. `plausibility` is the
+#' outlier-based measure this package used before it followed the standard: it
+#' compares values against an interval *derived* from the data rather than one
+#' declared in a specification. That makes it useful and cheap on data with no
+#' documentation, but it is not accuracy in the ISO sense — an outlier need not
+#' be wrong, and a wrong value can sit exactly on the mean — so it is reported
+#' separately and excluded from the overall score.
 #'
 #' The function never modifies the caller's data. Text normalisation and
 #' imputation are applied to an internal copy used for the statistics, and the
@@ -10,6 +27,9 @@
 #'
 #' @param data A data frame. Either `data` or `path` must be supplied.
 #' @param path Path to a `.csv`, `.xls` or `.xlsx` file.
+#' @param spec A [dg_spec()] declaring what the data is supposed to look like.
+#'   Optional; without it the nine specification-dependent measures report as
+#'   not applicable.
 #' @param outlier_method `"z_score"` (default) or `"iqr"`.
 #' @param imputation_method `"mean"` (default), `"median"` or `"none"`.
 #' @param correlation_threshold Absolute correlation above which a column pair
@@ -18,9 +38,10 @@
 #'   against the consistency score.
 #' @param category_column Optional grouping column for outlier and correlation
 #'   analysis.
-#' @param weights Named weights for the four dimensions in the overall score.
-#'   Dimensions that do not apply to the data are dropped and the remaining
-#'   weights renormalised.
+#' @param weights Named weights for the five characteristics in the overall
+#'   score. Characteristics that do not apply to the data are dropped and the
+#'   remaining weights renormalised. `timeliness` is accepted as an alias for
+#'   `currentness`.
 #' @param clean_text Normalise whitespace in character columns.
 #' @param strip_punctuation Also remove punctuation. Unicode-aware; off by
 #'   default because it is destructive.
@@ -40,16 +61,23 @@
 #' @examples
 #' report <- dg_assess(iris, verbose = FALSE)
 #' report$scores
-#' summary(report)
+#' report$measures[, c("code", "value", "a", "b")]
+#'
+#' # Declaring an expectation makes the accuracy measures computable.
+#' spec <- dg_spec(ranges = list(Sepal.Length = c(4, 8)),
+#'                 domains = list(Species = levels(iris$Species)))
+#' dg_assess(iris, spec = spec, verbose = FALSE)$scores
 #' @export
 dg_assess <- function(data = NULL, path = NULL,
+                       spec = NULL,
                        outlier_method = c("z_score", "iqr"),
                        imputation_method = c("mean", "median", "none"),
                        correlation_threshold = 0.5,
                        vif_threshold = 5,
                        category_column = NULL,
-                       weights = c(completeness = 1, accuracy = 1,
-                                   consistency = 1, timeliness = 1),
+                       weights = c(accuracy = 1, completeness = 1,
+                                   consistency = 1, credibility = 1,
+                                   currentness = 1),
                        clean_text = TRUE,
                        strip_punctuation = FALSE,
                        parse_dates = TRUE,
@@ -61,6 +89,13 @@ dg_assess <- function(data = NULL, path = NULL,
                        verbose = TRUE) {
   outlier_method <- match.arg(outlier_method)
   imputation_method <- match.arg(imputation_method)
+  if (is.null(spec)) spec <- dg_spec()
+  if (!inherits(spec, "dg_spec")) {
+    cli::cli_abort("{.arg spec} must come from {.fn dg_spec}, not {.cls {class(spec)[1]}}.")
+  }
+  # `timeliness` was the dissertation's name for what ISO calls currentness.
+  # Existing weight vectors keep working.
+  names(weights)[names(weights) == "timeliness"] <- "currentness"
   started <- Sys.time()
   timings <- c()
   step <- function(label, expr) {
@@ -105,8 +140,6 @@ dg_assess <- function(data = NULL, path = NULL,
 
   say(verbose, cli::cli_alert_info, "Analysing missing data...")
   missing <- step("missing", analyze_missing_data_patterns(data))
-  completeness_score <- if (n_col == 0L) NA_real_ else
-    clamp(10 * (1 - mean(missing$columns$rate)))
 
   duplicates <- if (check_duplicates) {
     say(verbose, cli::cli_alert_info, "Scanning for duplicate rows...")
@@ -114,13 +147,6 @@ dg_assess <- function(data = NULL, path = NULL,
   } else NULL
 
   dates <- step("dates", validate_dates(data))
-  timeliness_score <- NA_real_
-  if (nrow(dates) > 0L) {
-    n_dates <- sum(vapply(date_cols(data),
-                          function(c) sum(!is.na(data[[c]])), numeric(1L)))
-    bad <- sum(dates$n_future) + sum(dates$n_stale)
-    if (n_dates > 0L) timeliness_score <- clamp(10 * (1 - bad / n_dates))
-  }
 
   imputed <- step("impute",
                   impute_missing_values(analysis, imputation_method,
@@ -133,8 +159,11 @@ dg_assess <- function(data = NULL, path = NULL,
   outliers <- step("outliers",
                    detect_outliers(analysis, method = outlier_method,
                                    category_column = category_column))
-  accuracy_score <- if (nrow(outliers$by_column) == 0L) NA_real_ else
-    clamp(10 * (1 - outliers$rate))
+  # Not accuracy. The interval is derived from the data, where every ISO
+  # accuracy measure requires one that was declared, so this is reported on its
+  # own and kept out of the aggregate.
+  plausibility <- if (nrow(outliers$by_column) == 0L) NA_real_ else
+    clamp(1 - outliers$rate)
 
   say(verbose, cli::cli_alert_info, "Checking consistency...")
   redundancy <- step("redundancy",
@@ -153,8 +182,13 @@ dg_assess <- function(data = NULL, path = NULL,
          flag_anomalies_in_relationships(imputed, sample_size = sample_size, seed = seed))
   } else NULL
 
-  scores <- c(completeness = completeness_score, accuracy = accuracy_score,
-              consistency = consistency$score, timeliness = timeliness_score)
+  say(verbose, cli::cli_alert_info, "Measuring the ISO/IEC 25012 properties...")
+  # Measured on the parsed and normalised frame but before imputation: imputing
+  # a mean into an empty cell would make the completeness measures report the
+  # data as complete when it is not.
+  measures <- step("measures",
+                   dg_measure_table(data, spec, consistency, vif_threshold))
+  scores <- dg_characteristic_scores(measures)
   overall <- dg_overall(scores, weights)
 
   report <- structure(
@@ -174,8 +208,14 @@ dg_assess <- function(data = NULL, path = NULL,
       correlation = correlation,
       distribution = distribution,
       anomalies = anomalies,
+      measures = measures,
       scores = scores,
+      plausibility = plausibility,
+      # ISO's word for this characteristic is currentness; `timeliness` is the
+      # dissertation's, kept so that code written against v1 still reads.
+      timeliness = unname(scores[["currentness"]]),
       overall = overall,
+      spec = spec,
       weights = weights,
       settings = list(outlier_method = outlier_method,
                       imputation_method = imputation_method,

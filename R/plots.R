@@ -38,10 +38,12 @@ plot_scores <- function(x) {
   scores <- c(x$scores, overall = x$overall)
   df <- data.frame(dimension = names(scores), score = unname(scores),
                    stringsAsFactors = FALSE)
+  # A characteristic with no applicable measure has no bar to draw. Dropping it
+  # is the same choice the aggregate makes, so the figure and the score agree.
   df <- df[!is.na(df$score), , drop = FALSE]
   if (nrow(df) == 0L) return(NULL)
   df$band <- vapply(df$score, score_band, character(1L))
-  df$label <- sprintf("%.1f  %s", df$score, df$band)
+  df$label <- sprintf("%.3f  %s", df$score, df$band)
   df$dimension <- factor(df$dimension, levels = rev(df$dimension))
   bands <- dg_palette$status[c("critical", "serious", "warning", "good")]
 
@@ -53,12 +55,13 @@ plot_scores <- function(x) {
     ggplot2::geom_text(ggplot2::aes(label = .data$label), hjust = -0.08,
                        size = 3.2, colour = dg_palette$ink_muted) +
     ggplot2::scale_fill_manual(values = bands, guide = "none") +
-    ggplot2::scale_x_continuous(limits = c(0, 12.5), breaks = seq(0, 10, 2),
+    ggplot2::scale_x_continuous(limits = c(0, 1.25), breaks = seq(0, 1, 0.2),
                                 expand = c(0, 0)) +
-    ggplot2::labs(title = "Quality scores by dimension",
-                  subtitle = sprintf("%s | dimension names after ISO/IEC 25012; measures are this package's own",
-                                     x$source),
-                  x = "Score", y = NULL) +
+    ggplot2::labs(title = "Quality scores by characteristic",
+                  subtitle = sprintf("%s | ISO/IEC 25012 inherent characteristics, %s of %s measures applicable",
+                                     x$source, sum(x$measures$applicable),
+                                     nrow(x$measures)),
+                  x = "Score (ratio, 0-1)", y = NULL) +
     theme_dg() +
     ggplot2::theme(panel.grid.major.y = ggplot2::element_blank())
 }
