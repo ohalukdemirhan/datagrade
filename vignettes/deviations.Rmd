@@ -27,19 +27,24 @@ produces should read this page first.
 
 ### Consistency score for `iris`
 
-The dissertation reports **2.5%**. This package reports **2.5 / 10, which is
-25%**.
+The dissertation reports **2.5%**. The corresponding measure here -- risk of
+inconsistency, `RIES_INCO` -- reports **0.250, which is 25%**.
 
 The scoring function returned a proportion on 0--1 while completeness returned a
 score on 0--10, and the caller multiplied both by ten as though they were on the
 same scale. The underlying quantity was never wrong; its presentation was off by
-a factor of ten. Scores are now held on 0--10 everywhere and converted to
-percentages in exactly one place.
+a factor of ten. Scores are now held as ratios in $[0, 1]$ everywhere and
+converted to percentages in exactly one place.
 
 ```{r}
 report <- dg_assess(iris, verbose = FALSE)
-report$scores[["consistency"]]
+m <- report$measures
+m[m$code == "RIES_INCO", c("value", "a", "b")]
 ```
+
+Note that `report$scores[["consistency"]]` is no longer this number. Consistency
+is now a characteristic averaging every applicable property beneath it, of which
+`RIES_INCO` is one; see the section on the scoring model below.
 
 ### Redundant columns
 
@@ -117,7 +122,7 @@ It also runs with an extra condition that the dissertation did not need but this
 implementation does: a numeric column qualifies as a key only if its values are
 whole numbers. Without it, every continuous measurement column is distinct in
 every row, gets classified as an identifier, and is excluded from the
-statistics -- which silently inflated the consistency score to a perfect 10.
+statistics -- which silently inflated the consistency score to a perfect 1.
 
 ### Outliers are counted before imputation
 
@@ -156,19 +161,45 @@ Each has a named regression test in `tests/testthat/test-edge-cases.R`.
   (`flag_anomalies_in_relationships`) that Appendix A does not cover. It is
   retained, documented, and off by default.
 
-## The standard
+## The scoring model
 
-The dissertation cites ISO/IEC 25024:2015 eight times, all of them in the
-literature review, none in the methodology or implementation chapters. The
-citation establishes what the dimensions *mean*; it is not a claim of measure
-conformance, and this package does not make one either. See the "Relationship to
-ISO/IEC 25012 and 25024" section of `vignette("methodology")` for what would be
-required.
+This is the largest deviation, and it is structural rather than numerical.
+
+The dissertation scores **four dimensions** -- completeness, accuracy,
+consistency, timeliness -- with measures of its own devising. It cites ISO/IEC
+25024:2015 eight times, all in the literature review, none in the methodology or
+implementation chapters: the citation establishes what the dimensions *mean* and
+was never a claim of measure conformance.
+
+This package scores the **five inherent characteristics** of ISO/IEC 25012
+through the fifteen quality properties beneath them, each as a ratio $A/B$ over
+counted data items. Four consequences follow.
+
+* **`timeliness` became `currentness`**, which is ISO's word for the same
+  characteristic. `report$timeliness` still resolves, and `weights` still
+  accepts the old name.
+* **`credibility` is measured**, where the dissertation did not measure it at
+  all. Both its properties need a declaration, so it reports `NA` without a
+  `dg_spec()`.
+* **Accuracy became `plausibility`.** The dissertation's accuracy score compares
+  values against an interval *derived* from the data; all three ISO accuracy
+  properties need one that was *declared*. The measure is unchanged and still
+  reported -- under an honest name, and outside the overall score.
+* **Completeness counts cells, not column averages.** The dissertation averages
+  the per-column missing rates, which dilutes a badly damaged column: one column
+  30% empty out of four costs 0.075 rather than 0.3. `COMP_VAL_ESP` is the cell
+  ratio, which is the form the standard's $A/B$ takes. The old quantity is still
+  derivable from `report$missing$columns`.
+
+`vignette("methodology")` derives every measure. What remains unverified against
+the standard itself is which items ISO counts into each $A$ and $B$; that is
+stated there too.
 
 ## What did not change
 
-The scoring framework, the four dimensions, the choice of z-score and IQR
-methods, the VIF-based consistency check, the correlation-based redundancy
-check, the Shapiro-Wilk normality test, the mean and median imputation options,
-and the names of all thirteen helper functions. This is the dissertation's
-framework, repaired -- not a redesign.
+Every statistic. The choice of z-score and IQR methods, the VIF computation, the
+correlation-based redundancy check, the Shapiro-Wilk normality test, the mean and
+median imputation options, and the names of all thirteen helper functions. What
+changed is how those statistics are organised into scores -- the dissertation's
+framework, repaired and then mapped onto the standard, not a redesign of the
+statistics themselves.

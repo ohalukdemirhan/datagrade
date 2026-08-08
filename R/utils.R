@@ -53,15 +53,20 @@ subsample <- function(data, n, seed = 1L) {
   if (is.data.frame(data)) data[idx, , drop = FALSE] else data[idx]
 }
 
-# Scores are held on the dissertation's 0-10 scale everywhere internally.
-# The 0-100 conversion happens once, in as_pct(), which is the fix for the
-# scale mismatch that made the dissertation's consistency figure ten times
-# too small (2.5% where 25% was meant).
-as_pct <- function(score) round(score * 10, 1)
+# Scores are held as ratios in [0, 1] everywhere internally, the form ISO/IEC
+# 25024 measures take. The dissertation used a 0-10 scale; the conversion to
+# percent happens once, in as_pct(), which is also the fix for the scale
+# mismatch that made the dissertation's consistency figure ten times too small
+# (2.5% where 25% was meant).
+as_pct <- function(score) round(score * 100, 1)
 
-clamp <- function(x, lo = 0, hi = 10) max(lo, min(hi, x))
+clamp <- function(x, lo = 0, hi = 1) max(lo, min(hi, x))
 
+# cli interpolates `{expr}` in the frame of whoever called it, which here is
+# say() itself, not the function that wrote the message. Without .envir every
+# call site referring to a local — `{n_row}`, `{parsed_dates}` — aborts, so
+# dg_assess() failed on its own default of verbose = TRUE.
 say <- function(verbose, fun, ...) {
-  if (isTRUE(verbose)) fun(...)
+  if (isTRUE(verbose)) fun(..., .envir = parent.frame())
   invisible(NULL)
 }

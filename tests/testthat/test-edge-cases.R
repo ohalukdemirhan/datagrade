@@ -34,8 +34,11 @@ test_that("a data frame with no numeric columns scores only what applies", {
                    stringsAsFactors = FALSE)
   report <- dg_assess(df, verbose = FALSE)
   expect_true(is.na(report$scores[["accuracy"]]))
-  expect_true(is.na(report$scores[["consistency"]]))
-  expect_equal(report$overall, report$scores[["completeness"]])
+  expect_true(is.na(report$plausibility))
+  # CONS_FORM still applies to text columns, so consistency is measurable even
+  # with nothing numeric to compute a VIF from.
+  expect_true(is.na(report$measures$value[report$measures$code == "RIES_INCO"]))
+  expect_false(is.na(report$scores[["consistency"]]))
 })
 
 test_that("perfectly collinear columns are reported as infinite VIF, not an error", {
@@ -47,7 +50,7 @@ test_that("perfectly collinear columns are reported as infinite VIF, not an erro
   expect_length(vif, 3L)
   res <- calculate_consistency_score(df, vif_threshold = 5)
   expect_false(is.na(res$score))
-  expect_lt(res$score, 10)
+  expect_lt(res$score, 1)
 })
 
 test_that("VIF matches 1 / (1 - R squared) from an explicit regression", {

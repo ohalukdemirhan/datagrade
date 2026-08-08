@@ -4,7 +4,10 @@ test_that("dg_assess returns a structured object, not console text", {
   report <- dg_assess(iris, verbose = FALSE)
   expect_s3_class(report, "dg_report")
   expect_named(report$scores,
-               c("completeness", "accuracy", "consistency", "timeliness"))
+               c("accuracy", "completeness", "consistency", "credibility",
+                 "currentness"))
+  expect_s3_class(report$measures, "data.frame")
+  expect_equal(nrow(report$measures), 15L)
   expect_type(report$overall, "double")
   expect_s3_class(report$distribution, "data.frame")
   expect_s3_class(report$outliers$by_column, "data.frame")
@@ -35,13 +38,15 @@ test_that("summary returns tables and as.data.frame returns one stackable row", 
   report <- dg_assess(iris, verbose = FALSE)
   s <- summary(report)
   expect_s3_class(s$scores, "data.frame")
-  expect_equal(nrow(s$scores), 5L)          # four dimensions plus overall
+  expect_equal(nrow(s$scores), 6L)          # five characteristics plus overall
+  expect_equal(nrow(s$measures), 15L)
   expect_equal(nrow(s$columns), ncol(iris))
 
   row <- as.data.frame(report)
   expect_equal(nrow(row), 1L)
-  expect_true(all(c("completeness", "accuracy", "consistency", "timeliness",
-                    "overall", "rows", "columns") %in% names(row)))
+  expect_true(all(c("accuracy", "completeness", "consistency", "credibility",
+                    "currentness", "overall", "plausibility", "rows",
+                    "columns") %in% names(row)))
 
   # Stacking many assessments is the point of the one-row form.
   stacked <- do.call(rbind, lapply(list(iris, mtcars, airquality),
@@ -66,7 +71,7 @@ test_that("results are reproducible across runs", {
   expect_equal(a$distribution, b$distribution)
 })
 
-test_that("a clean data set scores near ten and a dirty one clearly lower", {
+test_that("a clean data set scores near one and a dirty one clearly lower", {
   set.seed(5)
   clean <- data.frame(a = rnorm(500), b = rnorm(500), c = rnorm(500))
   dirty <- clean
@@ -77,14 +82,14 @@ test_that("a clean data set scores near ten and a dirty one clearly lower", {
   clean_report <- dg_assess(clean, verbose = FALSE)
   dirty_report <- dg_assess(dirty, verbose = FALSE)
 
-  expect_gt(clean_report$overall, 9)
+  expect_gt(clean_report$overall, 0.9)
   expect_lt(dirty_report$overall, clean_report$overall)
   # Completeness is the mean missing rate *across columns*, per the
-  # dissertation's formula, so one 30%-empty column out of four costs 0.75
-  # points rather than 3. The dilution is a property of the published formula,
+  # dissertation's formula, so one 30%-empty column out of four costs 0.075
+  # rather than 0.3. The dilution is a property of the published formula,
   # not of this implementation.
-  expect_lt(dirty_report$scores[["completeness"]], 9.5)
-  expect_lt(dirty_report$scores[["consistency"]], 10)
+  expect_lt(dirty_report$scores[["completeness"]], 0.95)
+  expect_lt(dirty_report$scores[["consistency"]], 1)
 })
 
 test_that("duplicates are counted without materialising every duplicate row", {
