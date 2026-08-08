@@ -57,8 +57,8 @@ theme_dg <- function(base_size = 12) {
 # prints the band name next to the mark.
 score_band <- function(score) {
   if (is.na(score)) return("not applicable")
-  if (score >= 9) "good" else if (score >= 7) "warning" else
-    if (score >= 5) "serious" else "critical"
+  if (score >= 0.9) "good" else if (score >= 0.7) "warning" else
+    if (score >= 0.5) "serious" else "critical"
 }
 
 score_colour <- function(score) {

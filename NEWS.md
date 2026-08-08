@@ -1,3 +1,61 @@
+# datagrade 0.2.0
+
+Scoring now follows the ISO/IEC 25012 data quality model: five inherent
+characteristics, fifteen quality properties, each measured as a ratio `A / B`
+over counted data items in the form ISO/IEC 25024 measurement functions take.
+Every statistic the package computes is unchanged; what changed is how those
+statistics are organised into scores.
+
+## New
+
+* `dg_spec()` declares what the data is supposed to look like — required
+  columns, permitted domains, valid ranges, regular expressions, referential
+  sets, per-record rules, credibility criteria, provenance and update
+  expectations. Nine of the fifteen properties have a denominator that counts
+  *the items for which an expectation is defined*, which no data set contains;
+  this is where it comes from. Every argument is optional.
+* `report$measures` is a fifteen-row data frame giving each property's ISO code,
+  characteristic, value, `A`, `B`, whether it applied, and — when it did not —
+  which `dg_spec()` argument would make it apply.
+* Six properties are computable with no spec at all: `COMP_REG`,
+  `COMP_VAL_ESP`, `FAL_COMP_FICH`, `RIES_INCO`, `CONS_FORM` and `CONV_ACT`.
+  `FAL_COMP_FICH` catches cells that are occupied but empty (`"N/A"`,
+  `"unknown"`, `"-999"`); `CONS_FORM` measures each column against its own
+  dominant format, excluding free text rather than scoring it near zero.
+
+## Breaking
+
+* `report$scores` now holds the five ISO characteristics — `accuracy`,
+  `completeness`, `consistency`, `credibility`, `currentness` — where it held
+  four dimensions.
+* `timeliness` is renamed `currentness`, which is ISO's word for it.
+  `report$timeliness` still resolves and `weights` still accepts the old name.
+* **`accuracy` is `NA` unless a spec declares an interval, pattern or
+  reference.** All three ISO accuracy properties require a *declared*
+  expectation. The old measure — outliers against an interval derived from the
+  data — is unchanged, reported as `report$plausibility`, and excluded from the
+  overall score, because an outlier need not be wrong and a wrong value can sit
+  exactly on the mean.
+* Completeness counts cells, not the average of per-column missing rates. The
+  old quantity remains derivable from `report$missing$columns`.
+* Scores are **ratios in 0--1**, where they were on the dissertation's 0--10
+  scale. Percentages are unchanged, so every reported percentage reads exactly
+  as before. Code comparing raw scores against 0--10 thresholds needs its
+  cut-offs divided by ten; the `good`/`warning`/`serious`/`critical` bands now
+  break at 0.9, 0.7 and 0.5.
+* A characteristic with no applicable property is `NA` and is dropped from the
+  aggregate rather than scored zero. `NA` is a statement that `B` could not be
+  counted, not a claim about the data.
+* `summary()$scores` names its first column `characteristic`, not `dimension`,
+  and `summary()` gains a `measures` table.
+
+## Correctness
+
+* `dg_assess()` no longer aborts on its own default of `verbose = TRUE`. Progress
+  messages are interpolated by `cli` in the frame of the caller, which was the
+  internal `say()` helper rather than `dg_assess()`, so every message referring
+  to a local variable failed.
+
 # datagrade 0.1.0
 
 First release. Implements the data quality framework from Demirhan (2024), MSc
@@ -19,8 +77,8 @@ dissertation, University of Greenwich.
 
 ## Correctness
 
-* Consistency is scored on 0--10 like every other dimension. It previously
-  returned 0--1 and was multiplied by ten as though it were 0--10, which is why
+* Consistency is scored as a ratio in 0--1 like every other dimension. It was
+  previously multiplied by ten as though it were on a 0--10 scale, which is why
   the dissertation reports 2.5% for `iris` where 25% was meant.
 * `flag_redundant_columns()` no longer reports the literal strings `"row"` and
   `"col"` as redundant data columns.

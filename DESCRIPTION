@@ -1,17 +1,23 @@
 Package: datagrade
 Type: Package
-Title: Scored Data Quality Assessment for Open Data Sets
-Version: 0.1.0
+Title: Data Quality Assessment on the 'ISO/IEC' 25012 Model
+Version: 0.2.0
 Authors@R: person("Omer Haluk", "Demirhan", email = "hlk01dn@gmail.com",
     role = c("aut", "cre"))
-Description: A single-call data quality assessment that scores a data set on the
-    ISO/IEC 25024 dimensions of completeness, accuracy, consistency and
-    timeliness. Reports missing-data patterns, duplicates, redundant columns,
-    outliers, multicollinearity and distributional deviations, and returns a
-    structured object with plots rather than console text alone. The scoring
-    framework implements the methodology of the author's MSc dissertation,
-    "Assessing Data Quality Management Issues in Open-Sourced Data Sets with
-    Statistical Methodology" (University of Greenwich, 2024).
+Description: A single-call data quality assessment scoring a data set on the
+    five inherent characteristics of the 'ISO/IEC' 25012 data quality model,
+    accuracy, completeness, consistency, credibility and currentness, through
+    the fifteen quality properties beneath them. Each property is measured as a
+    ratio of counted data items, the form 'ISO/IEC' 25024 measurement functions
+    take. Six properties are computable from a table alone; the rest compare the
+    data against expectations declared through a specification object, and are
+    reported as not applicable rather than approximated when none is supplied.
+    Also reports missing-data patterns, duplicates, redundant columns, outliers,
+    multicollinearity and distributional deviations, and returns a structured
+    object with plots rather than console text alone. The statistics implement
+    the methodology of the author's MSc dissertation, "Assessing Data Quality
+    Management Issues in Open-Sourced Data Sets with Statistical Methodology"
+    (University of Greenwich, 2024).
 License: MIT + file LICENSE
 Encoding: UTF-8
 Depends: R (>= 4.1.0)

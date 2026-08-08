@@ -15,16 +15,17 @@ library(datagrade)
 Every score this package reports is written out below. Nothing is a black box,
 and where a choice is arguable the argument is given rather than hidden.
 
-All four dimension scores live on a **0--10 scale**. `as_pct()` converts once, at
-the point of display, to 0--100. Holding one scale internally is deliberate: the
-implementation this package replaces kept completeness on 0--10 and consistency
-on 0--1 and multiplied both by ten, which is why its published consistency
-figure for `iris` reads 2.5% where 25% was meant.
+All four dimension scores are **ratios in $[0, 1]$**, the form ISO/IEC 25024
+measures take. `as_pct()` converts once, at the point of display, to 0--100.
+Holding one scale internally is deliberate: the implementation this package
+replaces kept completeness on 0--10 and consistency on 0--1 and multiplied both
+by ten, which is why its published consistency figure for `iris` reads 2.5%
+where 25% was meant.
 
 ## Completeness
 
 $$
-\text{completeness} = 10 \times \left(1 - \frac{1}{p}\sum_{j=1}^{p} \frac{m_j}{n}\right)
+\text{completeness} = \left(1 - \frac{1}{p}\sum_{j=1}^{p} \frac{m_j}{n}\right)
 $$
 
 where $m_j$ is the number of missing values in column $j$, $n$ the row count and
@@ -33,7 +34,7 @@ $p$ the column count.
 This is the **mean of the per-column missing rates**, not the overall share of
 missing cells. The two differ whenever columns are unequally incomplete, and the
 column-averaged form dilutes a badly damaged column: one column that is 30%
-empty out of four costs 0.75 points, not 3. That is a property of the published
+empty out of four costs 0.075, not 0.3. That is a property of the published
 formula, kept here for continuity with the dissertation; if you want the cell
 ratio, compute it from `report$missing$columns`.
 
@@ -46,7 +47,7 @@ report$scores[["completeness"]]
 ## Accuracy
 
 $$
-\text{accuracy} = 10 \times \left(1 - \frac{\text{outliers flagged}}{\text{numeric values tested}}\right)
+\text{accuracy} = \left(1 - \frac{\text{outliers flagged}}{\text{numeric values tested}}\right)
 $$
 
 Outliers are flagged by one of two rules.
@@ -75,7 +76,7 @@ detect_outliers(df)$by_column
 ## Consistency
 
 $$
-\text{consistency} = 10 \times \frac{\left|\{j : \mathrm{VIF}_j \le \tau\}\right|}{p_{\text{num}}}
+\text{consistency} = \frac{\left|\{j : \mathrm{VIF}_j \le \tau\}\right|}{p_{\text{num}}}
 $$
 
 with $\tau$ = `vif_threshold`, default 5.
@@ -111,7 +112,7 @@ stay visible and still count against the score.
 ## Timeliness
 
 $$
-\text{timeliness} = 10 \times \left(1 - \frac{\text{future dates} + \text{stale dates}}{\text{dates present}}\right)
+\text{timeliness} = \left(1 - \frac{\text{future dates} + \text{stale dates}}{\text{dates present}}\right)
 $$
 
 A date is *future* if it is after `Sys.Date()`, *stale* if it is more than
@@ -172,40 +173,174 @@ r$scores
 r$overall
 ```
 
-## Relationship to ISO/IEC 25012 and 25024
+## The ISO/IEC 25012 model
 
-The four dimension names are drawn from the ISO/IEC 25012 data quality model,
-which is how the dissertation frames them. **The measures themselves are this
-package's own and are not ISO/IEC 25024 conformant measures.** That claim is not
-made anywhere in the package, and the reasons are worth being explicit about:
+Everything above is a statistic. This section is how those statistics become
+scores against the standard's model.
 
-* ISO/IEC 25012's fourth inherent characteristic is **currentness**, not
-  *timeliness*; *timeliness* comes from a different tradition. The package uses
-  the dissertation's word.
-* ISO/IEC 25024 measures take the form $X = A/B$ over counted *quality measure
-  elements*. Computing $B$ generally requires metadata -- for the accuracy-range
-  measure, $B$ is "the number of data items for which a required interval of
-  values can be defined", which cannot be known from the data alone. This is
-  precisely why the metadata-driven packages in this space require a data
-  dictionary before they will run.
-* ISO/IEC 25024 does not specify how measures aggregate into a per-characteristic
-  score. The 0--10 weighted mean here is this package's choice, not a standard's.
-* **Credibility**, the fifth inherent characteristic, is not measured at all.
+ISO/IEC 25012 defines five **inherent characteristics** of data quality --
+accuracy, completeness, consistency, credibility and currentness -- and beneath
+them fifteen **quality properties**. ISO/IEC 25024 gives each property a
+measurement function of the form
 
-Substituting a statistically derived interval for a specified one, as the
-accuracy score does, measures *plausibility* rather than accuracy in the ISO
-sense: an outlier need not be wrong, and a wrong value can sit exactly on the
-mean. Read the accuracy score accordingly.
+$$
+X = \frac{A}{B}
+$$
 
-A future release will accept an optional specification object describing
-expected ranges, required fields and valid domains. Supplying one would make the
-genuine $X = A/B$ measures computable; omitting it would keep today's
-zero-configuration behaviour.
+on a ratio scale over $[0.0, 1.0]$, where $A$ and $B$ are counts of *quality
+measure elements*: $A$ the items satisfying the property, $B$ the items **for
+which the property is defined at all**.
+
+That second count is the whole difficulty. For the accuracy-range property,
+$B$ is "the number of data items for which can be defined a required interval of
+values" -- and a required interval is not in the data. It is declared by whoever
+knows what the data means. This is exactly why every other R package in this
+space demands a data dictionary before it will run.
+
+`datagrade` splits the difference. Six properties have a $B$ countable from the
+table itself and are always measured; nine have a $B$ that only a declaration
+can supply, and `dg_spec()` is where it goes.
+
+```{r}
+report <- dg_assess(iris, verbose = FALSE)
+report$measures[, c("code", "characteristic", "value", "a", "b")]
+```
+
+### The six that need no declaration
+
+**`COMP_REG`, record completeness.** $A$ is records with every required field
+populated, $B$ is all records. With no `required` in the spec, every column
+counts as required.
+
+**`COMP_VAL_ESP`, data value completeness.** $A$ is populated cells in the
+required columns, $B$ is all cells in them. This differs from the dissertation's
+completeness, which averaged the per-column missing rates and so diluted a badly
+damaged column; the cell ratio is the form the standard's $A/B$ takes.
+
+**`FAL_COMP_FICH`, false completeness of file.** A cell can be occupied and
+still empty. $A$ is text values that are not placeholders, $B$ is all non-null
+text values in the required columns. The placeholder list is short and
+conservative on purpose -- every entry on it (`"none"`, `"unknown"`, `"-999"`)
+is a legitimate value in *some* data set, and a false positive silently lowers
+the score. Matching is case-insensitive after trimming. Replace the list with
+`null_equivalents`, or pass `character(0)` to disable the check.
+
+**`RIES_INCO`, risk of inconsistency.** $A$ is numeric columns with
+$\mathrm{VIF} \le \tau$, $B$ is numeric columns with a computable VIF. The
+reasoning: information held more than once can contradict itself, and a column
+whose variance is largely explained by the others carries no independent
+content. This is a **proxy**, not a contradiction count -- the standard's
+property concerns data items at risk of inconsistency, and collinearity is the
+only signal for that available without declared rules. Declared rules go to
+`CONS_SEMAN` instead.
+
+**`CONS_FORM`, format consistency.** Each value is reduced to a *signature*:
+runs of digits become `9`, runs of letters `A`, everything else is kept. So
+`"2024-01-15"` and `"1999-12-31"` share the signature `9-9-9`. $A$ is values
+matching their column's dominant signature, $B$ is non-null text values.
+
+The trap is free text. Every sentence is its own signature, so a prose column
+would score near zero for failing to conform to a format it never had. A column
+is therefore only measured when its values collapse to a handful of shapes --
+at most $\max(3, \lceil 0.05 \, d \rceil)$ signatures for $d$ distinct values.
+Columns that fail this test are dropped from $B$ and named in the measure's
+`note`, not scored.
+
+```{r}
+d <- data.frame(ref = c(rep("AB-1234", 8), "1234-AB", "XX/99"),
+                stringsAsFactors = FALSE)
+m <- dg_assess(d, verbose = FALSE)$measures
+m[m$code == "CONS_FORM", c("value", "a", "b")]
+```
+
+Declaring `formats` in the spec replaces the inferred signature with a required
+one, which changes the question from "is this column internally consistent?" to
+"does it match the rule?".
+
+**`CONV_ACT`, timeliness of update.** $A$ is dates neither in the future nor
+older than `max_age` (ten years by default), $B$ is all dates present. Future
+dates are counted against the score rather than ignored: they are impossible,
+and treating them as fresh would let a corrupt timestamp *raise* currentness.
+
+### The nine that need a declaration
+
+Each is `NA` until the corresponding `dg_spec()` argument is given, and each
+carries a `note` saying which argument that is. `NA` here is not a bad score --
+it is the statement that $B$ could not be counted. Aggregation drops these
+rather than scoring them zero, so an undocumented data set is never punished for
+being undocumented.
+
+Two details are worth stating because they change what the denominators mean.
+
+*`EXAC_SEMAN` joins on the declared key first.* A record with no counterpart in
+the reference is unverifiable, not inaccurate, so it never enters $B$.
+
+*`CONS_SEMAN` counts rule evaluations, not records.* $B$ is records times
+evaluable rules. A rule that errors -- because it names a column the data does
+not have -- is a specification error rather than a data failure: it is excluded
+from $B$ and named in the `note`.
+
+```{r}
+d <- data.frame(x = 1:4)
+m <- dg_assess(d, spec = dg_spec(rules = list(fine = ~ x > 0,
+                                              broken = ~ missing_col > 0)),
+               verbose = FALSE)$measures
+m[m$code == "CONS_SEMAN", c("value", "a", "b", "note")]
+```
+
+### Plausibility, which is not accuracy
+
+The dissertation's accuracy score flagged outliers against an interval derived
+from the data -- $\mu \pm 3\sigma$, or the IQR fence. All three ISO accuracy
+properties require an interval, pattern or reference that was *declared*.
+Substituting a derived one measures something real but different: an outlier
+need not be wrong, and a wrong value can sit exactly on the mean.
+
+So the measure is kept, renamed `plausibility`, reported beside the five
+characteristics and excluded from `overall`. It is the most useful number in the
+report for data that arrives with no documentation, and it is not the standard's
+measure.
+
+```{r}
+report$plausibility
+report$scores[["accuracy"]]   # NA: no interval was declared
+```
+
+### Aggregation, which the standard does not specify
+
+Properties combine into a characteristic by the unweighted mean over those that
+apply; characteristics combine into `overall` by the weighted mean over those
+that apply. **ISO/IEC 25024 does not address how measures should be
+aggregated**, so both steps are this package's choice and are stated as such
+rather than presented as conformance.
+
+$$
+\text{characteristic} = \frac{1}{|P|}\sum_{p \in P} X_p
+\qquad
+\text{overall} = \frac{\sum_{c \in C} w_c \, s_c}{\sum_{c \in C} w_c}
+$$
+
+where $P$ is the applicable properties of that characteristic and $C$ the
+applicable characteristics.
+
+### What is still not claimed
+
+The *model* implemented here -- five characteristics, fifteen properties, their
+identifiers, the $A/B$ form -- is sourced below. What is **not** verified
+against the standard is the exact definition of each property's quality measure
+elements: precisely which items ISO counts into $A$ and $B$. Those live in
+Annexes A--E of ISO/IEC 25024, which are not in any public source. Where this
+package had to choose, the choice is written out above and visible in the `a`
+and `b` columns of `report$measures`, so it can be checked and disagreed with.
+
+Note also that ISO's word is **currentness**; *timeliness* comes from a
+different tradition and was the dissertation's word. It is kept as
+`report$timeliness` and accepted in `weights`.
 
 ### Sources for the claims in this section
 
 ISO/IEC 25012 and 25024 are paywalled. Every statement above about their
-*structure* is cited below; the individual measure identifiers and formulas are
+*structure* is cited below. The standard's own measurement functions are
 deliberately **not** reproduced, because they could not be verified without the
 documents themselves.
 
@@ -234,7 +369,9 @@ documents themselves.
 
     The source for the five inherent characteristics being Accuracy,
     Completeness, Consistency, Credibility and Currentness — which is how the
-    naming mismatch with *timeliness* was established.
+    naming mismatch with *timeliness* was established — and for the
+    decomposition of each characteristic into the fifteen quality properties
+    and their identifiers implemented in this package.
 
 * Demirhan, O. H. (2024). *Assessing Data Quality Management Issues in
   Open-Sourced Data Sets with Statistical Methodology.* MSc dissertation,
@@ -244,5 +381,5 @@ documents themselves.
 
 The standard's Annexes A–E — the synoptic table of quality measure elements, the
 measures indexed by element and target entity, and the alphabetic measure list —
-are what a conformant implementation would need. They are not reproduced in any
-public source.
+are what would settle the remaining question of exactly which items belong in
+each $A$ and $B$. They are not reproduced in any public source.

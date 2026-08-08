@@ -12,8 +12,8 @@ calculate_consistency_score(data, vif_threshold = 5)
 \item{vif_threshold}{VIF above which a column counts as inconsistent.}
 }
 \value{
-A list with the score on a 0-10 scale, the VIF vector, and the names
-  of the offending columns.
+A list with the score as a ratio in `[0, 1]`, the VIF vector, and the
+  names of the offending columns.
 }
 \description{
 Consistency score from multicollinearity

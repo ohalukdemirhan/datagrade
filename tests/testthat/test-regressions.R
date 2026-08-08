@@ -26,17 +26,17 @@ test_that("a single redundant pair does not collapse the index matrix", {
   expect_length(res$columns, 1L)
 })
 
-test_that("consistency is scored on the same 0-10 scale as every other dimension", {
-  # The original returned a 0-1 proportion that the caller multiplied by 10 as
-  # though it were already 0-10, which is why the dissertation reports 2.5%
-  # for iris where 25% was meant.
+test_that("consistency is scored as a ratio in [0, 1] like every other dimension", {
+  # The dissertation computed this proportion and then multiplied it by 10 as
+  # though it were already a 0-10 score, which is why it reports 2.5% for iris
+  # where 25% was meant.
   res <- calculate_consistency_score(iris, vif_threshold = 5)
   expect_gte(res$score, 0)
-  expect_lte(res$score, 10)
-  expect_equal(as_pct(res$score), res$score * 10)
+  expect_lte(res$score, 1)
+  expect_equal(as_pct(res$score), round(res$score * 100, 1))
 
   report <- dg_assess(iris, verbose = FALSE)
-  expect_true(all(report$scores[!is.na(report$scores)] <= 10))
+  expect_true(all(report$scores[!is.na(report$scores)] <= 1))
   expect_true(all(report$scores[!is.na(report$scores)] >= 0))
 })
 
@@ -47,7 +47,7 @@ test_that("a column with zero variance does not turn the outlier count into NA",
   expect_equal(res$by_column$n_outliers[res$by_column$column == "constant"], 0L)
 
   report <- dg_assess(df, verbose = FALSE)
-  expect_false(is.na(report$scores[["accuracy"]]))
+  expect_false(is.na(report$plausibility))
 })
 
 test_that("identifier columns are detected before storage type is consulted", {
@@ -64,7 +64,7 @@ test_that("identifier columns are detected before storage type is consulted", {
 test_that("a continuous numeric column is never mistaken for an identifier", {
   # Distinctness alone cannot identify a key: rnorm() is distinct in every row,
   # so a bare uniqueness test silently removed real measurement columns from
-  # the analysis and inflated the consistency score to a perfect 10.
+  # the analysis and inflated the consistency score to a perfect 1.
   set.seed(5)
   df <- data.frame(a = rnorm(500), b = rnorm(500), row_id = 1:500)
   df$d <- df$b * 1.0001
@@ -77,7 +77,7 @@ test_that("a continuous numeric column is never mistaken for an identifier", {
   report <- dg_assess(df, verbose = FALSE)
   expect_equal(report$identifiers, "row_id")
   expect_true(any(is.infinite(report$consistency$vif)))
-  expect_lt(report$scores[["consistency"]], 10)
+  expect_lt(report$scores[["consistency"]], 1)
 })
 
 test_that("a mostly empty column is not mistaken for an identifier", {
@@ -112,7 +112,8 @@ test_that("dates are parsed before text cleaning, so timeliness is measurable", 
   report <- dg_assess(df, verbose = FALSE, strip_punctuation = TRUE)
   expect_equal(report$parsed_dates, "when")
   expect_equal(nrow(report$dates), 1L)
-  expect_false(is.na(report$scores[["timeliness"]]))
+  expect_false(is.na(report$scores[["currentness"]]))
+  expect_equal(report$timeliness, report$scores[["currentness"]])
 })
 
 test_that("kurtosis is excess kurtosis, so a normal sample scores near zero", {
