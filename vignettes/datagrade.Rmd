@@ -32,9 +32,63 @@ printout is a side effect and the object is the product.
 
 ```{r}
 report$scores
+report$measures[, c("code", "characteristic", "value", "a", "b")]
 report$outliers$by_column
 report$redundancy$pairs
 ```
+
+Each measure is a ratio `A / B`: `A` counts the data items satisfying the
+property, `B` the items for which the property is defined at all. A measure with
+`b = NA` is not a failing measure -- it is one whose denominator could not be
+counted, because nobody has said what the data is supposed to look like yet.
+
+## Declaring what the data should look like
+
+Six of the fifteen properties are computable from the table alone. The other
+nine compare the data against an expectation, and an expectation is declared,
+not discovered. `dg_spec()` is where it goes; every argument is optional and
+each one switches on the measures that depend on it.
+
+```{r}
+spec <- dg_spec(
+  required = c("Sepal.Length", "Species"),
+  ranges   = list(Sepal.Length = c(4, 8), Petal.Width = c(0, 3)),
+  domains  = list(Species = levels(iris$Species)),
+  rules    = list(petal_smaller = ~ Petal.Length < Sepal.Length)
+)
+spec
+```
+
+```{r}
+scored <- dg_assess(iris, spec = spec, verbose = FALSE)
+scored$scores
+scored$measures[scored$measures$applicable,
+                c("code", "value", "a", "b")]
+```
+
+Accuracy is now measurable, where without a spec it was `NA`. The `note` column
+says what each remaining measure is still waiting for:
+
+```{r}
+waiting <- scored$measures[!scored$measures$applicable, c("code", "note")]
+waiting
+```
+
+## Plausibility is not accuracy
+
+One number sits outside the model deliberately. `plausibility` flags outliers
+against an interval *derived* from the data, where every ISO accuracy property
+needs one that was *declared*. An outlier need not be wrong, and a wrong value
+can sit exactly on the mean -- so it is reported separately and left out of the
+overall score.
+
+```{r}
+report$plausibility
+report$scores[["accuracy"]]   # NA: nothing was declared
+```
+
+It is still the most useful single number in the report for data that arrives
+with no documentation, which is most open data.
 
 `summary()` gives the same content as tables:
 
@@ -54,7 +108,8 @@ sweep <- do.call(rbind, lapply(names(datasets), function(nm) {
   row$source <- nm
   row
 }))
-sweep[, c("source", "rows", "completeness", "accuracy", "consistency", "overall")]
+sweep[, c("source", "rows", "completeness", "consistency", "overall",
+          "plausibility")]
 ```
 
 ## Figures

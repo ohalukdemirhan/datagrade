@@ -10,20 +10,34 @@ print.dg_report <- function(x, ...) {
   cli::cli_text("{.strong Size:} {.val {x$n_row}} rows x {.val {x$n_col}} columns")
   cli::cli_text("{.strong Elapsed:} {round(x$elapsed, 2)}s")
 
-  cli::cli_h2("Scores")
+  cli::cli_h2("ISO/IEC 25012 characteristics")
+  n_measured <- table(factor(x$measures$characteristic[x$measures$applicable],
+                             levels = dg_characteristics))
+  n_total <- table(x$measures$characteristic)
   for (nm in names(x$scores)) {
     score <- x$scores[[nm]]
+    of <- sprintf("%s/%s measures", n_measured[[nm]], n_total[[nm]])
     if (is.na(score)) {
-      cli::cli_li("{.field {nm}}: not applicable")
+      cli::cli_li("{.field {nm}}: not applicable ({of})")
     } else {
       # The band name is printed next to every score, so the reading never
       # depends on a colour alone.
-      cli::cli_li("{.field {nm}}: {.strong {sprintf('%.1f', score)}}/10 ({as_pct(score)}%) - {score_band(score)}")
+      cli::cli_li("{.field {nm}}: {.strong {sprintf('%.3f', score)}} ({as_pct(score)}%) - {score_band(score)} ({of})")
     }
   }
   if (!is.na(x$overall)) {
     cli::cli_text("")
-    cli::cli_text("{.strong Overall: {sprintf('%.1f', x$overall)}/10 ({as_pct(x$overall)}%) - {score_band(x$overall)}}")
+    cli::cli_text("{.strong Overall: {sprintf('%.3f', x$overall)} ({as_pct(x$overall)}%) - {score_band(x$overall)}}")
+  }
+  if (!is.na(x$plausibility)) {
+    cli::cli_text("")
+    cli::cli_text("{.emph Not ISO:} plausibility {sprintf('%.3f', x$plausibility)} ({as_pct(x$plausibility)}%) - outliers against a derived interval, excluded from the overall score.")
+  }
+  n_na <- sum(!x$measures$applicable)
+  if (n_na > 0L) {
+    cli::cli_text("")
+    cli::cli_alert_info(
+      "{.val {n_na}} of {.val {nrow(x$measures)}} measures need a declared expectation. See {.code report$measures} and {.fn dg_spec}.")
   }
 
   cli::cli_h2("Findings")
@@ -70,19 +84,19 @@ print.dg_report <- function(x, ...) {
 #'
 #' @param object A `dg_report`.
 #' @param ... Unused.
-#' @return A list of data frames: `scores`, `columns`, `redundant_pairs` and
-#'   `distribution`.
+#' @return A list of data frames: `scores`, `measures`, `columns`,
+#'   `redundant_pairs` and `distribution`.
 #' @export
 summary.dg_report <- function(object, ...) {
   scores <- data.frame(
-    dimension = names(object$scores),
+    characteristic = names(object$scores),
     score = unname(object$scores),
     percent = as_pct(unname(object$scores)),
     band = vapply(unname(object$scores), score_band, character(1L)),
     weight = unname(object$weights[names(object$scores)]),
     stringsAsFactors = FALSE)
   scores <- rbind(scores, data.frame(
-    dimension = "overall", score = object$overall,
+    characteristic = "overall", score = object$overall,
     percent = as_pct(object$overall), band = score_band(object$overall),
     weight = NA_real_, stringsAsFactors = FALSE))
 
@@ -97,7 +111,7 @@ summary.dg_report <- function(object, ...) {
   cols <- cols[order(match(cols$column, names(object$types))), , drop = FALSE]
   row.names(cols) <- NULL
 
-  structure(list(scores = scores, columns = cols,
+  structure(list(scores = scores, measures = object$measures, columns = cols,
                  redundant_pairs = object$redundancy$pairs,
                  distribution = object$distribution,
                  source = object$source),
@@ -106,8 +120,11 @@ summary.dg_report <- function(object, ...) {
 
 #' @export
 print.summary.dg_report <- function(x, ...) {
-  cli::cli_h2("Scores")
+  cli::cli_h2("Characteristics")
   print(x$scores, row.names = FALSE)
+  cli::cli_h2("Measures")
+  print(x$measures[, c("code", "property", "characteristic", "value", "a", "b")],
+        row.names = FALSE)
   cli::cli_h2("Columns")
   print(x$columns, row.names = FALSE)
   if (nrow(x$redundant_pairs)) {
@@ -132,11 +149,14 @@ print.summary.dg_report <- function(x, ...) {
 as.data.frame.dg_report <- function(x, row.names = NULL, optional = FALSE, ...) {
   data.frame(
     source = x$source, rows = x$n_row, columns = x$n_col,
-    completeness = x$scores[["completeness"]],
     accuracy = x$scores[["accuracy"]],
+    completeness = x$scores[["completeness"]],
     consistency = x$scores[["consistency"]],
-    timeliness = x$scores[["timeliness"]],
+    credibility = x$scores[["credibility"]],
+    currentness = x$scores[["currentness"]],
     overall = x$overall,
+    plausibility = x$plausibility,
+    n_measures_applicable = sum(x$measures$applicable),
     n_missing = sum(x$missing$columns$n_missing),
     n_duplicates = if (is.null(x$duplicates)) NA_integer_ else x$duplicates$n,
     n_outliers = x$outliers$total,

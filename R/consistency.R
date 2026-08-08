@@ -46,8 +46,8 @@ dg_vif <- function(data) {
 #'
 #' @param data A data frame.
 #' @param vif_threshold VIF above which a column counts as inconsistent.
-#' @return A list with the score on a 0-10 scale, the VIF vector, and the names
-#'   of the offending columns.
+#' @return A list with the score as a ratio in `[0, 1]`, the VIF vector, and the
+#'   names of the offending columns.
 #' @examples
 #' calculate_consistency_score(iris)$score
 #' @export
@@ -58,10 +58,11 @@ calculate_consistency_score <- function(data, vif_threshold = 5) {
                 note = "fewer than two usable numeric columns"))
   }
   inflated <- names(vif)[vif > vif_threshold]
-  # Held on the same 0-10 scale as every other dimension. The original returned
-  # a 0-1 proportion that was then multiplied by 10 as if it were 0-10, which
-  # is why the dissertation reports 2.5% for the iris data where 25% was meant.
-  score <- 10 * (sum(vif <= vif_threshold) / length(vif))
+  # A ratio in [0, 1], the same scale as every other dimension. The dissertation
+  # computed this proportion and then multiplied it by 10 as if it were already
+  # a 0-10 score, which is why it reports 2.5% for the iris data where 25% was
+  # meant.
+  score <- sum(vif <= vif_threshold) / length(vif)
   list(score = score, vif = vif, inflated = inflated, note = NULL)
 }
 
