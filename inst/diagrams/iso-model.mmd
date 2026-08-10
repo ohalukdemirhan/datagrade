@@ -1,0 +1,85 @@
+%%{init: {"theme": "base", "flowchart": {"htmlLabels": false, "curve": "basis", "nodeSpacing": 18, "rankSpacing": 40}, "themeVariables": {"fontFamily": "Helvetica, Arial, sans-serif", "fontSize": "14px"}} }%%
+flowchart TB
+    ROOT["ISO/IEC 25012
+inherent data quality
+
+5 characteristics
+15 properties, each X = A / B
+
+green: no declaration needed, 6
+amber: needs a declaration, 9
+
+B uncountable ⇒ NA, never 0"]
+
+    ROOT --- AC
+    ROOT --- CO
+    ROOT --- CS
+    ROOT --- CR
+    ROOT --- CU
+
+    subgraph AC["Accuracy"]
+        direction TB
+        A1["EXAC_SINT
+syntactic accuracy"]
+        A2["EXAC_SEMAN
+semantic accuracy"]
+        A3["RAN_EXAC
+accuracy range"]
+        A1 ~~~ A2 ~~~ A3
+    end
+
+    subgraph CO["Completeness"]
+        direction TB
+        B1["COMP_REG
+record completeness"]
+        B2["COMP_VAL_ESP
+data value completeness"]
+        B3["COMP_FICH
+file completeness"]
+        B4["FAL_COMP_FICH
+false completeness of file"]
+        B1 ~~~ B2 ~~~ B3 ~~~ B4
+    end
+
+    subgraph CS["Consistency"]
+        direction TB
+        C1["INT_REF
+referential integrity"]
+        C2["RIES_INCO
+risk of inconsistency"]
+        C3["CONS_SEMAN
+semantic consistency"]
+        C4["CONS_FORM
+format consistency"]
+        C1 ~~~ C2 ~~~ C3 ~~~ C4
+    end
+
+    subgraph CR["Credibility"]
+        direction TB
+        D1["CRED_VAL_DAT
+data values credibility"]
+        D2["CRED_FUEN
+source credibility"]
+        D1 ~~~ D2
+    end
+
+    subgraph CU["Currentness"]
+        direction TB
+        E1["FREC_ACT
+update frequency"]
+        E2["CONV_ACT
+timeliness of update"]
+        E1 ~~~ E2
+    end
+
+    classDef root fill:#dbe9fa,stroke:#2a78d6,stroke-width:2.5px,color:#0b0b0b
+    classDef free fill:#d7f2e8,stroke:#1baf7a,stroke-width:1.5px,color:#0b0b0b
+    classDef needs fill:#fbedcc,stroke:#eda100,stroke-width:1.5px,color:#0b0b0b
+    classDef char fill:#fcfcfb,stroke:#256abf,stroke-width:1.5px,color:#256abf
+
+    class ROOT root
+    class B1,B2,B4,C2,C4,E2 free
+    class A1,A2,A3,B3,C1,C3,D1,D2,E1 needs
+    class AC,CO,CS,CR,CU char
+
+    linkStyle 5,6,7,8,9,10,11,12,13,14 stroke:#fcfcfb,stroke-width:0px,opacity:0

@@ -1,0 +1,44 @@
+%%{init: {"theme": "base", "flowchart": {"htmlLabels": false, "curve": "basis", "nodeSpacing": 30, "rankSpacing": 55}, "themeVariables": {"fontFamily": "Helvetica, Arial, sans-serif", "fontSize": "15px"}} }%%
+flowchart LR
+    P["a quality property
+X = A / B"] --> Q{"is B
+countable?"}
+
+    Q -- "no" --> NA1["value = NA
+applicable = FALSE
+note says what is missing"]
+    Q -- "yes" --> SC["value = A / B
+in [0, 1]"]
+
+    NA1 --> W1["a statement about the measurement:
+the standard's denominator
+could not be counted"]
+    SC --> W2["a statement about the data:
+this many items of B satisfied
+the property"]
+
+    W1 --> AGG["aggregation averages
+only what applies
+— an unmeasured property
+neither helps nor hurts"]
+    W2 --> AGG
+
+    Z["value = 0
+would mean: every item
+of B was checked and
+every one of them failed"]
+    Z -. "0 is not NA" .-> NA1
+
+    classDef prop fill:#dbe9fa,stroke:#2a78d6,stroke-width:2px,color:#0b0b0b
+    classDef q fill:#dedaf0,stroke:#4a3aa7,stroke-width:2px,color:#0b0b0b
+    classDef na fill:#ececeb,stroke:#52514e,stroke-width:1.5px,color:#0b0b0b
+    classDef ok fill:#d7f2e8,stroke:#1baf7a,stroke-width:1.5px,color:#0b0b0b
+    classDef bad fill:#f9dbdb,stroke:#e34948,stroke-width:1.5px,color:#0b0b0b
+    classDef note fill:#fcfcfb,stroke:#e4e3df,stroke-width:1px,color:#52514e
+
+    class P prop
+    class Q q
+    class NA1 na
+    class SC,AGG ok
+    class Z bad
+    class W1,W2 note

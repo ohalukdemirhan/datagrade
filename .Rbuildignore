@@ -9,3 +9,4 @@
 ^\.gitignore$
 ^LICENSE\.md$
 ^figure$
+^inst/diagrams$
