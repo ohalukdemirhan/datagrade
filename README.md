@@ -1,5 +1,12 @@
 # datagrade
 
+[![R](https://img.shields.io/badge/R-%E2%89%A5%204.1.0-2a78d6?style=flat-square&logo=r&logoColor=white)](https://www.r-project.org)
+[![model](https://img.shields.io/badge/model-ISO%2FIEC%2025012-1baf7a?style=flat-square)](#the-fifteen-properties)
+[![properties](https://img.shields.io/badge/properties-15%20·%206%20need%20no%20spec-eda100?style=flat-square)](#the-fifteen-properties)
+[![dependencies](https://img.shields.io/badge/dependencies-cli%20+%20ggplot2-4a3aa7?style=flat-square)](DESCRIPTION)
+[![10M rows](https://img.shields.io/badge/10M%20rows-38%20s-eb6834?style=flat-square)](#it-scales)
+[![licence](https://img.shields.io/badge/licence-MIT-52514e?style=flat-square)](LICENSE)
+
 Point it at a data frame. Get a score.
 
 `datagrade` assesses the quality of a tabular data set against the **ISO/IEC
@@ -16,6 +23,8 @@ something a person declares — so `dg_spec()` is where you declare it. Supply
 one and those measures light up. Supply nothing and they report as *not
 applicable*, never as zero: a score of zero is a claim about the data, `NA` is
 a statement that the standard's denominator could not be counted.
+
+![One call, and everything it produces](man/figures/assessment.png)
 
 ## Install
 
@@ -89,7 +98,11 @@ dg_assess(orders, spec = spec)
 ```
 
 Every argument is optional, and each one switches on the measures that depend
-on it. `report$measures` says which, and why the rest are still `NA`:
+on it:
+
+![Which spec argument unlocks which measure](man/figures/spec-map.png)
+
+`report$measures` says which, and why the rest are still `NA`:
 
 ```
           code   characteristic value    a    b                                note
@@ -104,7 +117,10 @@ on it. `report$measures` says which, and why the rest are still `NA`:
 
 `A` is the count of items satisfying the property, `B` the count of items for
 which the property is defined at all. That second number is where the metadata
-lives, and it is the whole reason nine measures need a spec.
+lives, and it is the whole reason nine measures need a spec — and the whole
+reason an unmeasurable property reports `NA` rather than zero:
+
+![NA is a statement about the measurement; zero is a claim about the data](man/figures/applicability.png)
 
 Figures come from `dg_plots(report)`:
 
@@ -147,6 +163,16 @@ Everything technical lives in the vignettes, not here.
 - `vignette("scalability")` — how the numbers above are achieved
 - `vignette("deviations")` — how this differs from the dissertation it implements
 
+The diagrams above are generated, not drawn. Their sources are in
+`inst/diagrams/*.mmd` and regenerate with
+
+```bash
+mmdc -i inst/diagrams/iso-model.mmd -o man/figures/iso-model.png -b '#fcfcfb' -s 1.5 -w 1600
+```
+
+They use the same palette as the figures, `dg_palette` in `R/palette.R`, so a
+diagram and a plot in the same README are the same colour system.
+
 ## Background
 
 This implements the framework from:
@@ -161,6 +187,8 @@ release keeps its statistics but restructures the scoring to follow the ISO/IEC
 `vignette("deviations")` lists every difference and the reason for it.
 
 ## The fifteen properties
+
+![The ISO/IEC 25012 model as datagrade implements it](man/figures/iso-model.png)
 
 | Characteristic | Property | Code | Needs a spec |
 |---|---|---|---|

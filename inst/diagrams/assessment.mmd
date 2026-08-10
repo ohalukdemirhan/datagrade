@@ -1,0 +1,51 @@
+%%{init: {"theme": "base", "flowchart": {"htmlLabels": false, "curve": "basis"}, "themeVariables": {"fontFamily": "Helvetica, Arial, sans-serif", "fontSize": "15px"}} }%%
+flowchart LR
+    IN["data frame
+or path=
+.csv .tsv .txt .xls .xlsx"]
+    SPEC["dg_spec()
+required · patterns · domains
+ranges · rules · reference
+expected_records · ...
+OPTIONAL"]
+
+    IN --> ASSESS["dg_assess()"]
+    SPEC -. "declares B" .-> ASSESS
+
+    ASSESS --> M["15 quality properties
+each measured as A / B"]
+    M --> CH["5 inherent characteristics
+unweighted mean of what applies"]
+    CH --> OV["overall
+weighted mean of what applies"]
+
+    ASSESS --> PL["plausibility
+interval derived from the data
+NOT ISO — excluded from overall"]
+    ASSESS --> FIND["findings
+missingness · duplicates · outliers
+redundancy · VIF · deviations"]
+
+    OV --> REP
+    PL --> REP
+    FIND --> REP["report object
+$scores  $measures  $redundancy"]
+
+    REP --> P1["print()"]
+    REP --> P2["dg_plots()"]
+    REP --> P3["as.data.frame()
+one row, stackable"]
+
+    classDef input fill:#ececeb,stroke:#52514e,stroke-width:1.5px,color:#0b0b0b
+    classDef spec fill:#dedaf0,stroke:#4a3aa7,stroke-width:1.5px,color:#0b0b0b
+    classDef core fill:#dbe9fa,stroke:#2a78d6,stroke-width:2.5px,color:#0b0b0b
+    classDef iso fill:#d7f2e8,stroke:#1baf7a,stroke-width:1.5px,color:#0b0b0b
+    classDef notiso fill:#fbe2d7,stroke:#eb6834,stroke-width:1.5px,color:#0b0b0b
+    classDef out fill:#fbedcc,stroke:#eda100,stroke-width:1.5px,color:#0b0b0b
+
+    class IN input
+    class SPEC spec
+    class ASSESS,REP core
+    class M,CH,OV iso
+    class PL,FIND notiso
+    class P1,P2,P3 out

@@ -1,0 +1,47 @@
+%%{init: {"theme": "base", "flowchart": {"htmlLabels": false, "curve": "basis", "nodeSpacing": 6, "rankSpacing": 90}, "themeVariables": {"fontFamily": "Helvetica, Arial, sans-serif", "fontSize": "14px"}} }%%
+flowchart LR
+    s1["patterns
+domains"]
+    s2["reference
+reference_key"]
+    s3["ranges"]
+    s4["expected_records"]
+    s5["foreign_keys"]
+    s6["rules"]
+    s7["credible_ranges
+credible_domains"]
+    s8["source_trust
+trusted_sources"]
+    s9["update_interval"]
+    s10["required
+null_equivalents
+formats · update_column
+max_age · as_of"]
+    s1 --> m1["EXAC_SINT
+syntactic accuracy"]
+    s2 --> m2["EXAC_SEMAN
+semantic accuracy"]
+    s3 --> m3["RAN_EXAC
+accuracy range"]
+    s4 --> m4["COMP_FICH
+file completeness"]
+    s5 --> m5["INT_REF
+referential integrity"]
+    s6 --> m6["CONS_SEMAN
+semantic consistency"]
+    s7 --> m7["CRED_VAL_DAT
+data values credibility"]
+    s8 --> m8["CRED_FUEN
+source credibility"]
+    s9 --> m9["FREC_ACT
+update frequency"]
+    s10 -. "refines, does not unlock" .-> m10["the six measures
+that already run"]
+
+    classDef spec fill:#dedaf0,stroke:#4a3aa7,stroke-width:1.5px,color:#0b0b0b
+    classDef unlocked fill:#fbedcc,stroke:#eda100,stroke-width:1.5px,color:#0b0b0b
+    classDef running fill:#d7f2e8,stroke:#1baf7a,stroke-width:1.5px,color:#0b0b0b
+
+    class s1,s2,s3,s4,s5,s6,s7,s8,s9,s10 spec
+    class m1,m2,m3,m4,m5,m6,m7,m8,m9 unlocked
+    class m10 running
