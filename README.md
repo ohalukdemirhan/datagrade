@@ -6,6 +6,8 @@
 [![dependencies](https://img.shields.io/badge/dependencies-cli%20+%20ggplot2-4a3aa7?style=flat-square)](DESCRIPTION)
 [![10M rows](https://img.shields.io/badge/10M%20rows-38%20s-eb6834?style=flat-square)](#it-scales)
 [![licence](https://img.shields.io/badge/licence-MIT-52514e?style=flat-square)](LICENSE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22064234.svg)](https://doi.org/10.5281/zenodo.22064234)
+[![R-CMD-check](https://github.com/ohalukdemirhan/datagrade/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/ohalukdemirhan/datagrade/actions/workflows/R-CMD-check.yaml)
 
 Point it at a data frame. Get a score.
 
