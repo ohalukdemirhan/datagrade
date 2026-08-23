@@ -2,7 +2,7 @@ Package: datagrade
 Type: Package
 Title: Data Quality Assessment on the 'ISO/IEC' 25012 Model
 Version: 0.2.0
-Authors@R: person("Omer Haluk", "Demirhan", email = "hlk01dn@gmail.com",
+Authors@R: person("Omer Haluk", "Demirhan", email = "halukdemirhan@hotmail.com",
     role = c("aut", "cre"))
 Description: A single-call data quality assessment scoring a data set on the
     five inherent characteristics of the 'ISO/IEC' 25012 data quality model,

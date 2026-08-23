@@ -10,3 +10,6 @@
 ^LICENSE\.md$
 ^figure$
 ^inst/diagrams$
+^cran-comments\.md$
+^paper$
+^CONTRIBUTING\.md$
