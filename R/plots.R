@@ -198,12 +198,19 @@ plot_distribution <- function(x) {
 #' Save every report figure to a directory
 #'
 #' @param x A `dg_report`.
-#' @param dir Output directory, created if needed.
+#' @param dir Output directory, created if needed. There is no default, so
+#'   nothing is written unless a path is given.
 #' @param width,height,dpi Passed to [ggplot2::ggsave()].
 #' @param device File format.
 #' @return The file paths, invisibly.
+#' @examples
+#' report <- dg_assess(iris, verbose = FALSE)
+#' out <- file.path(tempdir(), "datagrade-figures")
+#' paths <- dg_save_plots(report, out)
+#' basename(paths)
+#' unlink(out, recursive = TRUE)
 #' @export
-dg_save_plots <- function(x, dir = "datagrade-figures", width = 9, height = 5.5,
+dg_save_plots <- function(x, dir, width = 9, height = 5.5,
                            dpi = 150, device = "png") {
   figures <- dg_plots(x)
   dir.create(dir, showWarnings = FALSE, recursive = TRUE)

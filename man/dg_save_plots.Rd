@@ -4,19 +4,13 @@
 \alias{dg_save_plots}
 \title{Save every report figure to a directory}
 \usage{
-dg_save_plots(
-  x,
-  dir = "datagrade-figures",
-  width = 9,
-  height = 5.5,
-  dpi = 150,
-  device = "png"
-)
+dg_save_plots(x, dir, width = 9, height = 5.5, dpi = 150, device = "png")
 }
 \arguments{
 \item{x}{A `dg_report`.}
 
-\item{dir}{Output directory, created if needed.}
+\item{dir}{Output directory, created if needed. There is no default, so
+nothing is written unless a path is given.}
 
 \item{width, height, dpi}{Passed to [ggplot2::ggsave()].}
 
@@ -27,4 +21,11 @@ The file paths, invisibly.
 }
 \description{
 Save every report figure to a directory
+}
+\examples{
+report <- dg_assess(iris, verbose = FALSE)
+out <- file.path(tempdir(), "datagrade-figures")
+paths <- dg_save_plots(report, out)
+basename(paths)
+unlink(out, recursive = TRUE)
 }
