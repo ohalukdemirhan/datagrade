@@ -153,11 +153,14 @@ real data replicated with jitter. R 4.5.2, macOS arm64, single core.
 | 5,000,000 | 340 MB | 17.08 s | 0.11 s | 83 KB |
 | **10,000,000** | **680 MB** | **38.04 s** | **0.12 s** | **83 KB** |
 
-Cost per row is 1.37 µs at 54 thousand rows and 0.94 µs at 10 million — it goes
-*down*, because fixed startup amortises. The input grows 185-fold; the report
-object grows 1%, because it holds statistics and never the data. Figures render
-in constant time at every size. Scores are identical at every size, which is how
-you know the subsampling isn't biasing anything.
+A full assessment costs about 2.2 µs per row at 54 thousand rows and 3.8 µs at
+10 million; the difference between the two is the duplicate scan. Without it
+(`check_duplicates = FALSE`), cost per row is 1.37 µs at 54 thousand and 0.94 µs
+at 10 million — it goes *down*, because fixed startup amortises. The input
+grows 185-fold; the report object grows 1%, because it holds statistics and
+never the data. Figures render in constant time at every size. Scores are
+identical at every size, which is how you know the subsampling isn't biasing
+anything.
 
 Reproduce it yourself: `Rscript inst/bench/benchmark.R`.
 

@@ -38,9 +38,11 @@ R 4.5.2, macOS arm64, single core.
 
 Three things to read off that table.
 
-**Cost is linear.** Per-row cost is 1.37 µs at 54 thousand rows and 0.94 µs at
-10 million -- it goes *down*, because fixed startup cost amortises. There is no
-size at which the curve bends.
+**Without the duplicate scan, cost is linear.** Per-row cost in the "No
+duplicate scan" column is 1.37 µs at 54 thousand rows and 0.94 µs at 10 million
+-- it goes *down*, because fixed startup cost amortises. The full assessment
+rises from about 2.2 µs to 3.8 µs per row over the same range; the difference
+is the duplicate scan, covered under "How" below.
 
 **The report does not grow.** The input grows 185-fold, from 3.5 MB to 680 MB.
 The returned object grows by about 1%, from 82 KB to 83 KB. It holds summary
