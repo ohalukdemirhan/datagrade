@@ -1,5 +1,6 @@
 # datagrade
 
+[![CRAN](https://img.shields.io/cran/v/datagrade?style=flat-square&color=2a78d6)](https://CRAN.R-project.org/package=datagrade)
 [![R](https://img.shields.io/badge/R-%E2%89%A5%204.1.0-2a78d6?style=flat-square&logo=r&logoColor=white)](https://www.r-project.org)
 [![model](https://img.shields.io/badge/model-ISO%2FIEC%2025012-1baf7a?style=flat-square)](#the-fifteen-properties)
 [![properties](https://img.shields.io/badge/properties-15%20·%206%20need%20no%20spec-eda100?style=flat-square)](#the-fifteen-properties)
@@ -29,6 +30,12 @@ a statement that the standard's denominator could not be counted.
 ![One call, and everything it produces](man/figures/assessment.png)
 
 ## Install
+
+```r
+install.packages("datagrade")
+```
+
+The development version is on GitHub:
 
 ```r
 # install.packages("remotes")
