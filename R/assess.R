@@ -116,10 +116,13 @@ dg_assess <- function(data = NULL, path = NULL,
   # stripping turns "2024-01-15" into "20240115" and no date column ever
   # exists to measure timeliness against.
   parsed_dates <- character(0)
+  unparsed <- list()
   if (parse_dates) {
     data <- step("parse_dates", parse_date_columns(data))
     parsed_dates <- attr(data, "dg_parsed_dates") %||% character(0)
+    unparsed <- attr(data, "dg_unparsed_dates") %||% list()
     attr(data, "dg_parsed_dates") <- NULL
+    attr(data, "dg_unparsed_dates") <- NULL
     if (length(parsed_dates)) {
       say(verbose, cli::cli_alert_success,
           "Parsed {.val {length(parsed_dates)}} column{?s} as dates: {.field {parsed_dates}}")
@@ -140,6 +143,14 @@ dg_assess <- function(data = NULL, path = NULL,
 
   say(verbose, cli::cli_alert_info, "Analysing missing data...")
   missing <- step("missing", analyze_missing_data_patterns(data))
+  # Cells that held a value in a different date format were turned into NA by
+  # parsing; they are not missing, so the missing-data summary is corrected.
+  for (nm in names(unparsed)) {
+    i <- match(nm, missing$columns$column)
+    k <- length(unparsed[[nm]]$rows)
+    missing$columns$n_missing[i] <- missing$columns$n_missing[i] - k
+    missing$columns$rate[i] <- missing$columns$n_missing[i] / max(n_row, 1L)
+  }
 
   duplicates <- if (check_duplicates) {
     say(verbose, cli::cli_alert_info, "Scanning for duplicate rows...")
@@ -187,7 +198,8 @@ dg_assess <- function(data = NULL, path = NULL,
   # a mean into an empty cell would make the completeness measures report the
   # data as complete when it is not.
   measures <- step("measures",
-                   dg_measure_table(data, spec, consistency, vif_threshold))
+                   dg_measure_table(data, spec, consistency, vif_threshold,
+                                    unparsed))
   scores <- dg_characteristic_scores(measures)
   overall <- dg_overall(scores, weights)
 
@@ -199,6 +211,7 @@ dg_assess <- function(data = NULL, path = NULL,
       types = types,
       identifiers = identifiers,
       parsed_dates = parsed_dates,
+      unparsed_dates = unparsed_table(unparsed),
       missing = missing,
       duplicates = duplicates,
       dates = dates,
@@ -241,6 +254,19 @@ dg_assess <- function(data = NULL, path = NULL,
 #'   is kept as an alias.
 #' @export
 data_quality_assessment <- function(...) dg_assess(...)
+
+unparsed_table <- function(unparsed) {
+  if (!length(unparsed)) {
+    return(data.frame(column = character(0), n = integer(0),
+                      examples = character(0), stringsAsFactors = FALSE))
+  }
+  data.frame(
+    column = names(unparsed),
+    n = vapply(unparsed, function(u) length(u$rows), integer(1L)),
+    examples = vapply(unparsed, function(u) paste(u$examples, collapse = ", "),
+                      character(1L)),
+    stringsAsFactors = FALSE, row.names = NULL)
+}
 
 dg_read <- function(data, path, verbose = TRUE) {
   if (!is.null(data)) {

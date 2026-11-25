@@ -65,6 +65,12 @@ print.dg_report <- function(x, ...) {
   if (length(x$consistency$inflated)) {
     cli::cli_li("VIF above {x$settings$vif_threshold}: {.field {x$consistency$inflated}}")
   }
+  if (!is.null(x$unparsed_dates) && nrow(x$unparsed_dates)) {
+    for (i in seq_len(nrow(x$unparsed_dates))) {
+      u <- x$unparsed_dates[i, ]
+      cli::cli_li("Dates in another format: {.val {u$n}} in {.field {u$column}} (e.g. {u$examples}), counted against format consistency")
+    }
+  }
   if (nrow(x$dates)) {
     cli::cli_li("Date columns: {.val {nrow(x$dates)}}, future dates {.val {sum(x$dates$n_future)}}, stale {.val {sum(x$dates$n_stale)}}")
   }

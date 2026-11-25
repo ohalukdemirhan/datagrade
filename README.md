@@ -140,6 +140,48 @@ Figures come from `dg_plots(report)`:
 Also works on files — `dg_assess(path = "data.csv")` — for `.csv`, `.tsv`,
 `.txt`, `.xls` and `.xlsx`.
 
+## Comparing two deliveries
+
+The same data set arrives every month. `dg_compare()` scores both versions
+against the same spec and says what moved:
+
+```r
+old <- airquality
+new <- airquality
+new$Ozone[1:40] <- NA   # a sensor stopped reporting
+new$Wind <- NULL        # a column was dropped upstream
+
+dg_compare(old, new)
+```
+
+```
+── Data quality comparison ─────────────────────────────────────────────
+Rows: 153 -> 153
+
+── ISO/IEC 25012 characteristics ──
+
+• accuracy: n/a -> n/a (not applicable)
+• completeness: 0.839 -> 0.731 (declined)
+• consistency: 1.000 -> 1.000 (unchanged)
+• credibility: n/a -> n/a (not applicable)
+• currentness: n/a -> n/a (not applicable)
+
+Overall: 0.919 -> 0.865 (declined)
+
+── Measures that changed ──
+
+• `COMP_REG` Record completeness: 0.725 -> 0.556 (declined)
+• `COMP_VAL_ESP` Data value completeness: 0.952 -> 0.906 (declined)
+
+── What changed in the data ──
+
+• Columns removed: Wind
+• More missing values in: Ozone (24.2% -> 42.5%)
+```
+
+A measure that was computable last month and is not this month is reported as
+`lost`, not as a drop to zero.
+
 ## It scales
 
 Benchmarked on `ggplot2::diamonds` (53,940 × 10, MIT licensed), then the same

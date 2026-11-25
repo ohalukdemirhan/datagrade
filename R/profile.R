@@ -94,20 +94,36 @@ parse_date_columns <- function(data, min_success = 0.9, sample_n = 5000L) {
   formats <- c("%Y-%m-%d", "%Y/%m/%d", "%d/%m/%Y", "%d-%m-%Y",
                "%Y-%m-%d %H:%M:%S", "%d.%m.%Y")
   converted <- character(0)
+  unparsed <- list()
   for (col in which_cols(data, is.character)) {
     x <- data[[col]]
-    probe <- subsample(x[!is.na(x)], sample_n)
+    # Blank cells are missing values, not candidate dates. Counting them in the
+    # probe meant a date column with many empty cells (cases not yet closed)
+    # was never recognised as one.
+    blank <- !is.na(x) & !nzchar(trimws(x))
+    probe <- subsample(x[!is.na(x) & !blank], sample_n)
     if (length(probe) == 0L) next
     for (fmt in formats) {
       parsed <- suppressWarnings(as.Date(probe, format = fmt))
       if (mean(!is.na(parsed)) >= min_success) {
-        data[[col]] <- suppressWarnings(as.Date(x, format = fmt))
+        as_date <- suppressWarnings(as.Date(x, format = fmt))
+        # A value that was present but does not match the column's format is
+        # not missing: it is a format inconsistency. Its rows are kept so the
+        # completeness measures count it as present and CONS_FORM against.
+        failed <- !is.na(x) & !blank & is.na(as_date)
+        if (any(failed)) {
+          unparsed[[col]] <- list(rows = which(failed),
+                                  examples = utils::head(unique(x[failed]), 5L),
+                                  format = fmt)
+        }
+        data[[col]] <- as_date
         converted <- c(converted, col)
         break
       }
     }
   }
   attr(data, "dg_parsed_dates") <- converted
+  attr(data, "dg_unparsed_dates") <- unparsed
   data
 }
 

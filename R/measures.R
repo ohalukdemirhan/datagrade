@@ -56,24 +56,34 @@ has_discernible_format <- function(sigs, values) {
 
 # ---------------------------------------------------------------- completeness
 
-m_comp_reg <- function(data, spec) {
+# Which cells are missing. A date written in a format other than its column's
+# was turned into NA by parsing, but it was present in the data; it counts as
+# present here and against format consistency instead.
+missing_cells <- function(data, cols, unparsed = list()) {
+  m <- vapply(data[cols], is.na, logical(nrow(data)))
+  if (!is.matrix(m)) m <- matrix(m, nrow = nrow(data), dimnames = list(NULL, cols))
+  for (nm in intersect(names(unparsed), cols)) m[unparsed[[nm]]$rows, nm] <- FALSE
+  m
+}
+
+m_comp_reg <- function(data, spec, unparsed = list()) {
   cols <- intersect(spec$required %||% names(data), names(data))
   if (length(cols) == 0L || nrow(data) == 0L) {
     return(measure("COMP_REG", "Record completeness", "completeness",
                    note = "no required columns present"))
   }
-  complete <- stats::complete.cases(data[, cols, drop = FALSE])
+  complete <- rowSums(missing_cells(data, cols, unparsed)) == 0L
   measure("COMP_REG", "Record completeness", "completeness",
           a = sum(complete), b = nrow(data))
 }
 
-m_comp_val_esp <- function(data, spec) {
+m_comp_val_esp <- function(data, spec, unparsed = list()) {
   cols <- intersect(spec$required %||% names(data), names(data))
   if (length(cols) == 0L || nrow(data) == 0L) {
     return(measure("COMP_VAL_ESP", "Data value completeness", "completeness",
                    note = "no required columns present"))
   }
-  n_missing <- sum(vapply(data[cols], function(col) sum(is.na(col)), numeric(1L)))
+  n_missing <- sum(missing_cells(data, cols, unparsed))
   total <- nrow(data) * length(cols)
   measure("COMP_VAL_ESP", "Data value completeness", "completeness",
           a = total - n_missing, b = total)
@@ -201,13 +211,21 @@ m_ries_inco <- function(consistency, vif_threshold) {
           a = sum(vif <= vif_threshold), b = length(vif))
 }
 
-m_cons_form <- function(data, spec) {
+m_cons_form <- function(data, spec, unparsed = list()) {
   cols <- chr_cols(data)
-  if (length(cols) == 0L) {
+  # Parsed date columns are no longer text, but the values that failed to
+  # parse are exactly the format inconsistencies this measure exists to find.
+  date_a <- 0; date_b <- 0
+  for (nm in intersect(names(unparsed), names(data))) {
+    n_ok <- sum(!is.na(data[[nm]]))
+    date_a <- date_a + n_ok
+    date_b <- date_b + n_ok + length(unparsed[[nm]]$rows)
+  }
+  if (length(cols) == 0L && date_b == 0) {
     return(measure("CONS_FORM", "Format consistency", "consistency",
                    note = "no text columns to inspect"))
   }
-  a <- 0; b <- 0; skipped <- character(0)
+  a <- date_a; b <- date_b; skipped <- character(0)
   for (nm in cols) {
     col <- as_chr(data[[nm]])
     vals <- col[!is.na(col)]
@@ -371,13 +389,14 @@ m_frec_act <- function(data, spec) {
 
 # ----------------------------------------------------------------- aggregation
 
-dg_measure_table <- function(data, spec, consistency, vif_threshold) {
+dg_measure_table <- function(data, spec, consistency, vif_threshold,
+                             unparsed = list()) {
   ms <- list(
-    m_comp_reg(data, spec), m_comp_val_esp(data, spec),
+    m_comp_reg(data, spec, unparsed), m_comp_val_esp(data, spec, unparsed),
     m_comp_fich(data, spec), m_fal_comp_fich(data, spec),
     m_exac_sint(data, spec), m_exac_seman(data, spec), m_ran_exac(data, spec),
     m_int_ref(data, spec), m_ries_inco(consistency, vif_threshold),
-    m_cons_seman(data, spec), m_cons_form(data, spec),
+    m_cons_seman(data, spec), m_cons_form(data, spec, unparsed),
     m_cred_val_dat(data, spec), m_cred_fuen(data, spec),
     m_frec_act(data, spec), m_conv_act(data, spec)
   )

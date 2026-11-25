@@ -112,6 +112,30 @@ sweep[, c("source", "rows", "completeness", "consistency", "overall",
           "plausibility")]
 ```
 
+## Comparing two deliveries
+
+When the same data set arrives repeatedly, the question is what changed.
+`dg_compare()` assesses both versions under one specification, so a change in
+a score is a change in the data rather than in the yardstick:
+
+```{r}
+old <- airquality
+new <- airquality
+new$Ozone[1:40] <- NA   # a sensor stopped reporting
+new$Wind <- NULL        # a column was dropped upstream
+cmp <- dg_compare(old, new)
+cmp
+```
+
+Every table on the object carries `old`, `new`, `change` and `status`. A
+change smaller than `tolerance` (one percentage point by default) is
+`unchanged`; a measure computable in only one version is `lost` or `gained`:
+
+```{r}
+cmp$scores
+head(cmp$missing, 3)
+```
+
 ## Figures
 
 `dg_plots()` returns a named list of ggplot objects. Every figure is built from

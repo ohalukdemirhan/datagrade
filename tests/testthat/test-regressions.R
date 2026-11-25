@@ -156,3 +156,41 @@ test_that("the caller's data frame is never modified", {
   dg_assess(df, verbose = FALSE)
   expect_identical(df, snapshot)
 })
+
+test_that("a date in another format is a format inconsistency, not a missing value", {
+  # Parsing used to turn the minority-format values into NA, so a present
+  # value was reported as missing and format consistency never saw it.
+  d <- data.frame(id = 1:40,
+                  when = format(as.Date("2026-01-01") + 0:39),
+                  stringsAsFactors = FALSE)
+  d$when[1:3] <- c("03/02/2026", "14 Feb 2026", "2026.02.15")
+  r <- dg_assess(d, verbose = FALSE)
+  m <- r$measures
+  expect_equal(m$value[m$code == "COMP_VAL_ESP"], 1)
+  expect_equal(m$value[m$code == "COMP_REG"], 1)
+  expect_equal(m$a[m$code == "CONS_FORM"], 37)
+  expect_equal(m$b[m$code == "CONS_FORM"], 40)
+  expect_equal(r$missing$columns$n_missing[r$missing$columns$column == "when"], 0)
+  expect_equal(r$unparsed_dates$column, "when")
+  expect_equal(r$unparsed_dates$n, 3L)
+  out <- cli::cli_fmt(print(r))
+  expect_true(any(grepl("Dates in another format", out)))
+  # Genuinely missing dates are still missing.
+  d$when[10] <- NA
+  m2 <- dg_assess(d, verbose = FALSE)$measures
+  expect_equal(m2$a[m2$code == "COMP_VAL_ESP"], 79)
+})
+
+test_that("blank cells neither block date detection nor count as format errors", {
+  # Seen on NYC 311 data: an open case has an empty closed_date, so a third of
+  # the column was "" and the column was not recognised as dates at all.
+  d <- data.frame(id = 1:30,
+                  closed = c(format(as.Date("2026-11-01") + 0:19), rep("", 10)),
+                  stringsAsFactors = FALSE)
+  r <- dg_assess(d, verbose = FALSE)
+  expect_true("closed" %in% r$parsed_dates)
+  expect_equal(nrow(r$unparsed_dates), 0L)
+  m <- r$measures
+  expect_equal(m$a[m$code == "COMP_VAL_ESP"], 50)
+  expect_equal(r$missing$columns$n_missing[r$missing$columns$column == "closed"], 10)
+})

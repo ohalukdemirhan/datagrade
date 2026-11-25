@@ -1,16 +1,9 @@
-## Resubmission
+## Update
 
-This is a resubmission. In response to the review of 3 September 2026:
-
-* Removed the single quotes around ISO/IEC in the Title and Description; only
-  package, software and API names would be quoted, and there are none.
-* Added links to the references in the Description, in the form
-  authors (year) <https:...>: the two ISO/IEC standards and the dissertation
-  the methodology comes from. None of the three has a DOI or ISBN.
-* `dg_save_plots()` no longer has a default output directory, so nothing is
-  written unless the user supplies a path. Its new example writes to
-  `tempdir()` and removes the files afterwards. No other function, example,
-  vignette or test writes outside `tempdir()`.
+This is an update from 0.2.0 to 0.3.0. It adds one exported function,
+`dg_compare()`, which compares two deliveries of the same data set on the
+ISO/IEC 25012 measures, with its tests, an example and a vignette section. It also fixes two
+date-parsing bugs found while testing on public city data sets; see NEWS.md.
 
 ## Test environments
 
@@ -21,8 +14,6 @@ This is a resubmission. In response to the review of 3 September 2026:
 0 errors | 0 warnings | 1 note.
 
 ```
-New submission
-
 Found the following (possibly) invalid URLs:
   URL: https://www.iso.org/standard/35736.html
   URL: https://www.iso.org/standard/35749.html
@@ -31,12 +22,9 @@ Found the following (possibly) invalid URLs:
 ```
 
 These are the official ISO catalogue pages for ISO/IEC 25012 and ISO/IEC 25024,
-the standards this package implements. They resolve correctly in a browser;
-iso.org returns 403 to automated requests, so the note is a false positive.
-The first submission's win-builder and Debian pretests did not report them.
+the standards this package implements. They resolve in a browser; iso.org
+returns 403 to automated requests. The same URLs were accepted with 0.2.0.
 
-The first submission's pretest also flagged "computable", "currentness" and
-"multicollinearity" as possibly misspelled. All three are spelled correctly;
-"currentness" is the name ISO/IEC 25012 gives to one of the five inherent data
-quality characteristics, so it is used deliberately rather than replaced with
-"currency" or "timeliness". "Demirhan" is the author's surname.
+## Reverse dependencies
+
+There are no reverse dependencies.

@@ -1,3 +1,36 @@
+# datagrade 0.3.0
+
+## New
+
+* `dg_compare(old, new)` compares two deliveries of the same data set — last
+  month's extract and this month's, a file before and after a pipeline change.
+  Both are scored under one `dg_spec()` and the same settings, so a change in a
+  score is a change in the data. It reports each characteristic, the overall
+  score and all fifteen measures with `old`, `new`, `change` and `status`;
+  columns added, removed or retyped; the row count; the duplicate rate; and the
+  missing-value rate of every shared column. Changes smaller than `tolerance`
+  (one percentage point by default) are `unchanged`. A measure computable in
+  only one version is `lost` or `gained`, never a drop to zero. Two existing
+  `dg_report` objects can be compared too, with a warning when they were
+  produced under different specifications or settings.
+
+## Correctness
+
+* A date written in a format other than its column's dominant one is now a
+  format inconsistency, not a missing value. Parsing used to turn such values
+  into `NA`, so a present cell lowered `COMP_VAL_ESP` and `COMP_REG` and was
+  never seen by `CONS_FORM`. They are listed in `report$unparsed_dates` and in
+  the printed findings.
+* Blank cells no longer stop a column from being recognised as dates. A date
+  column in which many cells were empty (on NYC 311 data, the closing date of
+  cases still open) was left as text.
+
+## Documentation
+
+* The scalability vignette states which timing the per-row cost figures come
+  from: 1.37 and 0.94 µs are measured without the duplicate scan; the full
+  assessment rises from about 2.2 to 3.8 µs per row.
+
 # datagrade 0.2.0
 
 Scoring now follows the ISO/IEC 25012 data quality model: five inherent

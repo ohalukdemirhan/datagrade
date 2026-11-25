@@ -1,7 +1,7 @@
 Package: datagrade
 Type: Package
 Title: Data Quality Assessment on the ISO/IEC 25012 Model
-Version: 0.2.0
+Version: 0.3.0
 Authors@R: person("Omer Haluk", "Demirhan", email = "hlk01dn@gmail.com",
     role = c("aut", "cre"))
 Description: A single-call data quality assessment scoring a data set on the
@@ -15,8 +15,9 @@ Description: A single-call data quality assessment scoring a data set on the
     against expectations declared through a specification object, and are
     reported as not applicable rather than approximated when none is supplied.
     Also reports missing-data patterns, duplicates, redundant columns, outliers,
-    multicollinearity and distributional deviations, and returns a structured
-    object with plots rather than console text alone. The statistics implement
+    multicollinearity and distributional deviations, compares two deliveries
+    of the same data set measure by measure, and returns a structured object
+    with plots rather than console text alone. The statistics implement
     the methodology of the author's master's dissertation, Demirhan (2024)
     "Assessing Data Quality Management Issues in Open-Sourced Data Sets with
     Statistical Methodology"
